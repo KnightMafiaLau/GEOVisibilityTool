@@ -26,27 +26,64 @@ disable-model-invocation: false
 
 ## 你（Claude）要做的事
 
-### 1. 先拿到 5 项输入
+### 1. 先拿到输入 + 处理 probe-plan.yaml（**关键：每个测试 run 的"账本"**）
+
+#### 1.1 基本输入
 
 1. **queries.yaml**（路径或粘贴内容）——schema 要符合 geo-queries 的输出
-2. **目标 LLM**——下面两种之一：
+2. **输出目录**——默认 = `queries.yaml` 所在的目录。**所有相关文件（queries.yaml / probe-plan.yaml / probe-results-*.yaml / analysis.md）都假设在同一目录**——这是 `geo-analyze` 后续对账的前提。
+3. **你（agent）有没有浏览器工具**——没有就停下来告诉用户："这个 skill 需要 agent 有浏览器能力（Claude-in-Chrome / Codex 浏览器 / 别的 MCP），装上再调"
+4. **延迟范围**（可选）——默认 `--min 20 --max 60` 秒之间随机。**不允许设成 0 或 < 5 秒**。
 
-   **预设**（用户报名字即可）：
-   - `Kimi` → https://www.kimi.com
-   - `豆包` → https://www.doubao.com
-   - `DeepSeek` → https://chat.deepseek.com
-   - `百度文心` → https://yiyan.baidu.com
-   - `千问` → https://chat.qwen.ai
-   - `元宝` → https://yuanbao.tencent.com
+#### 1.2 probe-plan.yaml：先 check，再决定怎么走
 
-   **自定义**（用户给三项）：
-   - `name`：报告里显示用（如 "Gemini"、"ChatGPT"、"内部 LLM"）
-   - `url`：聊天界面入口
-   - `notes`（可选）：登录要求、特殊操作、网页结构提示
+在同目录下找 `probe-plan.yaml`：
 
-3. **输出路径**——默认 `./probe-results-<llm>-<date>.yaml`，用户可以改
-4. **你（agent）有没有浏览器工具**——没有就停下来告诉用户："这个 skill 需要 agent 有浏览器能力（Claude-in-Chrome / Codex 浏览器 / 别的 MCP），装上再调"
-5. **延迟范围**（可选）——默认 `--min 20 --max 60` 秒之间随机。想更保险（不易触发风控）就调大，想更快就调小。**不允许设成 0 或 < 5 秒**——会被风控当爬虫。
+**情况 1：plan 不存在 → 这是首次 probe，先创建 plan**
+
+问用户：
+
+> 这是这个品牌的第 1 次 probe。开始前先记一下你**整次测试计划测哪几个 LLM**（用来后续 analyze 时对账，防止漏跑）。
+> 预设可选：Kimi / 豆包 / DeepSeek / 百度文心 / 千问 / 元宝
+> 也可以加自定义 LLM（给我 name + url）。
+> 计划列表？
+
+拿到列表后,**先写 probe-plan.yaml**（不要等跑完才写）：
+
+```yaml
+brand: <品牌名>
+queries_file: <queries.yaml 的相对/绝对路径>
+created_at: <ISO timestamp>
+
+planned_llms:
+  - Kimi
+  - 豆包
+  - DeepSeek
+
+completed: []        # 跑完一个 append 一个
+
+# 自定义 LLM 单独记
+custom_llms: []      # [{name, url, notes}, ...]
+```
+
+接着问"这次先跑 planned_llms 里的哪一个？"。
+
+**情况 2：plan 已存在 → 接续跑**
+
+读 plan，算出 `pending = planned_llms - [c.llm for c in completed]`：
+
+- 如果 `pending == []` → 报给用户："plan 显示全部 LLM 已跑完。要重跑哪一个？（重跑会覆盖该 LLM 的 probe-results）" → 等用户明示
+- 否则 → "plan 显示还差这些没跑：[pending]。这次跑哪一个？"
+
+**用户选定的 LLM 必须在 plan.planned_llms 里**。不在就停下问："这个 LLM 不在原计划里，要把它加进 plan.planned_llms 吗？"——别擅自加。
+
+#### 1.3 确定本次 LLM 的入口 URL
+
+预设直接用内置 URL（Kimi/豆包/DeepSeek/百度文心/千问/元宝）；自定义 LLM 从 plan.custom_llms 里读 url。
+
+#### 1.4 确定输出路径
+
+默认 `<output-dir>/probe-results-<llm-slug>-<date>.yaml`。slug 用小写 ASCII（kimi / doubao / deepseek / baidu / qwen / yuanbao；自定义自取）。
 
 ### 2. 开跑前必须先确认
 
@@ -225,18 +262,35 @@ results:
     citations: []
 ```
 
-### 8. 跑完总结
+### 8. 跑完更新 probe-plan.yaml + 总结
 
-读一遍输出文件，给用户：
+**第一件事：更新 plan**。把刚跑完的 LLM 追加到 `completed`：
 
-> Probe 完成。
-> - 输出文件：<路径>
+```yaml
+completed:
+  - llm: <LLM 名>           # 必须与 planned_llms 里的写法一致
+    file: ./probe-results-<llm-slug>-<date>.yaml
+    probed_at: <ISO timestamp>
+```
+
+**手动编辑 plan.yaml** 即可（YAML 简单,Edit 工具读改写都没问题；不需要单独 Python 命令）。
+
+**第二件事:总结 + 报 plan 进度**。读一遍输出文件 + 重读 plan,给用户：
+
+> Probe 完成: **<LLM>**
+> - 输出文件: <路径>
 > - 成功 <N> / 失败 <M>
 > - 目标品牌 **<品牌名>** 命中 <X> 条（<X/N> %）
-> - 出现最多的竞品：<前 3 个>
-> - 引用源最常见的域名：<前 5 个>
+> - 出现最多的竞品: <前 3 个>
+> - 引用源最常见的域名: <前 5 个>
 >
-> 下一步：用 `geo-analyze` skill 把这份结果算成 visibility 分数和报告。
+> **Plan 进度: <M>/<N> 完成,还差 <K> 个: [pending list]**
+>
+> 下一步:
+> - 还有 pending 的 LLM → 推荐**继续跑下一个**(直接说 LLM 名,我接着调本 skill)
+> - 全部跑完 → 用 `geo-analyze` skill 出 visibility 报告
+
+**这一步是缺口防漏的关键**——用户看到 "还差 K 个" 就不会以为已经齐了。
 
 ---
 

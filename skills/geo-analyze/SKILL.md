@@ -30,21 +30,78 @@ disable-model-invocation: false
 
 ## 你（Claude）要做的事
 
-### 1. 拿 2 项输入
+### 1. 定位"测试目录" + 读 probe-plan.yaml 对账（**关键防漏步**）
 
-1. **probe-results 文件路径**（1 个或多个）。常见形态：
-   - 单 LLM：`./probe-results-kimi-2026-05-30.yaml`
-   - 多 LLM：用户给一个目录，或者列出多份
-2. **输出路径**——默认 `./analysis-<brand>-<date>.md`，用户可改
+#### 1.1 定位测试目录
 
-### 2. 读所有输入文件 + 校验
+用户调用本 skill 时通常只丢一个东西过来:
 
-每份文件都用 `Read` 工具读进来。读完做基本校验：
+- 一个目录（最常见）
+- 或一份 probe-results-*.yaml 文件路径（从中推出父目录）
+- 或一份 probe-plan.yaml 路径（从中推出父目录）
+
+**所有相关文件假设在同一目录**（geo-probe 已经强制了这一点）。先把"测试目录"算出来,后面 plan / 所有 probe-results / 输出 md 都在这个目录下。
+
+#### 1.2 读 probe-plan.yaml
+
+在测试目录下找 `probe-plan.yaml`。
+
+**情况 A — plan 存在(标准路径)**:
+
+读出 `planned_llms` 和 `completed`,算 `pending = planned_llms - [c.llm for c in completed]`。
+
+**情况 A.1 — pending 为空(全跑完了)**:
+- 按 plan.completed 列表拿到所有 probe-results 文件路径
+- 报一句"plan 显示 N 个 LLM 全部跑完,开始分析" → 继续后面流程
+
+**情况 A.2 — pending 非空(有缺口) → STOP,停下来跟用户对话**:
+
+这是核心防漏点。**不要列 a/b/c 菜单,直接对话式跟用户对账**:
+
+> 我在测试目录看到 `probe-plan.yaml`:
+> - 你计划测 **N** 个 LLM: [planned 列表]
+> - 已完成 **M** 个: [completed 列表]
+> - **还差 K 个没跑**: [pending 列表]
+>
+> 我先停一下——这几个没跑完,直接 analyze 会拿到 partial 数据,visibility 分数和零命中清单都会有偏差。
+>
+> 你想怎么处理?
+> - 我现在回去帮你把缺的跑了(推荐;直接告诉我先跑哪个,我接着调 geo-probe)
+> - 改 plan,把缺的从 planned_llms 里删掉(明确放弃测这几个就不算缺口了)
+> - 强制用现有 M 份做 partial 分析(我会在输出 md 里把 `partial: true / missing: [...]` 标得醒目,提醒下游 geo-report 这是不完整数据)
+
+**等用户明确回复再继续**。**不要自作主张挑路**。
+
+**情况 B — plan 不存在(用户跳过了 plan 机制 / 旧数据)**:
+
+降级到 sniff 模式:
+
+1. glob 测试目录下所有 `probe-results-*.yaml`
+2. 读每份的 header,拿 `target_llm` 名,列给用户:
+   > 没找到 probe-plan.yaml。我在目录里 sniff 到 N 份 probe-results:
+   > - probe-results-kimi-2026-05-30.yaml (LLM: Kimi)
+   > - probe-results-doubao-2026-05-30.yaml (LLM: 豆包)
+   > ...
+   > 用这 N 份分析吗?如果原计划还有别的 LLM 没跑,现在告诉我,我先去补。
+
+等用户明确点头再继续。**不要静默继续**——这是当时 bambulab 案例漏 qwen 的直接原因。
+
+#### 1.3 输出路径
+
+默认 `<测试目录>/analysis-<brand>-<date>.md`,用户可改。
+
+### 2. 读所有 probe-results 文件 + 校验
+
+按上一步确定的文件列表,每份用 `Read` 工具读进来。读完做基本校验：
 
 - ✓ 必须有 `brand` / `target_llm` / `results` 字段
 - ✓ 所有文件的 `brand` 必须一致（否则停下问用户："你给了不同品牌的 probe 结果，是想合一起还是分开分析？")
 - ✓ 每条 result 必须有 `query_id` / `intent` / `status`
 - ✓ status=success 的至少要有 `summary.target_brand`（schema 不对就停，让用户检查）
+
+**读完汇报一次**(再次防漏):
+
+> 已加载 **N** 份 probe-results,覆盖 LLM: [list]。每份 results 条数: [Kimi=30, 豆包=30, ...]。开始算分析?
 
 ### 3. 按下面口径算 6 个核心指标
 
@@ -226,6 +283,8 @@ analyzed_at: <ISO timestamp>
 llms_analyzed: [<LLM1>, <LLM2>, ...]
 queries_total: 30
 analysis_version: v1
+partial: false                       # 只有用户明确选择"用现有的跑 partial"才设 true
+missing_llms: []                     # 当 partial: true 时,列出计划但缺数据的 LLM
 ---
 
 # GEO Analysis: <品牌名>
@@ -320,4 +379,6 @@ analysis_version: v1
 - 不要算"竞品的可见度分数"
 - 不要拍 LLM 用户量权重——跨 LLM 一律算术平均
 - 不要假装数据齐全——缺失就标 null，并在输出里写清楚为什么
+- **不要静默继续**——如果 probe-plan.yaml 显示 pending 非空,或 sniff 出与预期不符的文件数,**必须停下来对话**,不要悄悄按"有什么用什么"算分
+- **partial: true 是用户明确决策才设的**——不准默认 true,不准为了"能跑就跑"自动降级
 - 不要把 probe 阶段已经判断好的字段（mentions / sentiment / rank）**重判**——口径不一致会越改越乱
