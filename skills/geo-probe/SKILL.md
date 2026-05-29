@@ -74,16 +74,43 @@ disable-model-invocation: false
    ```
 2. 打开目标 LLM 的网址
 3. 如果需要登录 / 撞验证码 / 网页结构变了 → **停下来报给用户**，让他处理后再继续
-4. 问 q001，等回答完整出现
-5. 抓回答全文，做以下事：
-   - 语义判断命中了哪些品牌（见第 4 步规则）
-   - `echo "<answer-text>" | python3 probe.py extract-citations` → 拿到 citations YAML 块
-   - 组装一条 result block（见输出 schema），通过管道追加：`echo "<block>" | python3 probe.py append <output-path>`
-6. 让用户瞄一眼："第 1 条跑通了，回答约 N 字，命中了 [品牌1, 品牌2]，引用了 [N] 个源。继续跑剩下 29 条吗？"
+4. 问 q001（**注意：q001 是 品牌识别 类，会直接点名品牌**），等回答完整出现
+5. 按第 4 步规则生成 summary + 抽 citations + 组 result block，`echo "<block>" | python3 probe.py append <output-path>`
+6. 让用户瞄一眼："第 1 条跑通了，target_brand.mentions=N / sentiment=X。继续跑后面 4 条 品牌识别 吗？"
 
 用户点头后再继续。
 
-### 4. 跑剩下的 29 条
+### 4. 跑 q002-q005（剩下 4 条品牌识别）
+
+按第 5 步同样流程跑 q002 / q003 / q004 / q005，每条之间走 `probe.py wait`。
+
+**跑完 q005 必须中场汇报**（这是关键 GEO 信号检查点）：
+
+读一遍输出文件,统计 q001-q005 的 `target_brand.mentions` 和 `sentiment`,按以下三种情况报给用户:
+
+**情况 A — 完全 0 收录**（5 条 mentions 全 0）
+> 5 条 品牌识别 跑完，**目标品牌 `<品牌名>` 在 <LLM> 上完全没被识别**（5 条 mentions 全 0）。
+> 这是 0 收录信号。**剩下 25 条会变得更有价值**——用来摸清:
+> - 这个垂类里谁占位（看竞品在 探索发现 / 选型推荐 类的出现）
+> - 模型在这个领域引哪些站（citations）→ 给 `geo-channels` 当输入,告诉你该往哪发内容
+> - 哪些 prompt 是"该出现但没出现"的零命中机会
+> 默认继续跑（推荐），还是停在这里？
+
+**情况 B — 误识别**（mentions ≥ 1 但 sentiment 含 negative，notes 标了"误识别"）
+> 5 条 品牌识别 跑完，**模型把 `<品牌名>` 串到了另一家公司**。
+> 这是误识别信号。剩下 25 条照常跑，可以告诉你模型在"正确语境"下是否会自然提到你（vs 提到那家串掉的同名公司）。
+> 默认继续跑（推荐），还是停在这里？
+
+**情况 C — 识别正确**（多数 mentions ≥ 1 且无误识别）
+> 5 条 品牌识别 跑完，模型识别正确，target_brand 平均 mentions=N / 主流 sentiment=X。
+> 剩下 25 条照常跑——主要看自然提及率和竞品排名。
+> 继续吗？
+
+**所有情况下,默认推荐"继续"**——不要因为 0 收录就劝用户停。停了就拿不到 actionable。
+
+用户点头后再进入第 5 步。
+
+### 5. 跑剩下的 25 条（q006-q030）
 
 对每条 query：
 
@@ -124,7 +151,7 @@ disable-model-invocation: false
 9. **追加结果**：组装 result block → `echo "<block>" | python3 probe.py append <output>`（每条立刻持久化）
 10. **等下一条**：`python3 probe.py wait --min <X> --max <Y>`（默认 20 / 60；这是 Python `time.sleep`，硬执行）
 
-### 5. 失败处理：停下来问用户
+### 6. 失败处理：停下来问用户
 
 任何一条 query 跑不下去，停止 probe，把现状告诉用户，让用户决定下一步：
 
@@ -145,7 +172,7 @@ disable-model-invocation: false
 
 **不要自作主张跳过。不要硬撑。不要编答案。**
 
-### 6. 输出格式（`probe.py` 维护，你只需理解 schema）
+### 7. 输出格式（`probe.py` 维护，你只需理解 schema）
 
 ```yaml
 brand: <品牌名>
@@ -198,7 +225,7 @@ results:
     citations: []
 ```
 
-### 7. 跑完总结
+### 8. 跑完总结
 
 读一遍输出文件，给用户：
 
@@ -312,6 +339,8 @@ results:
 ## 不做的事
 
 - 不要在没确认前开跑
+- 不要因为 q001-q005 的 品牌识别 显示"0 收录"就劝用户停掉——剩下 25 条恰恰更有价值
+- 不要跳过 q005 后的中场汇报（这是关键 GEO 信号检查点）
 - 不要在浏览器工具失效 / 撞验证码时硬撑或编造答案
 - 不要在一个对话里串问多条（会污染上下文）
 - 不要算分、出报告、做品牌对比——那是 `geo-analyze` / `geo-report` 的事
