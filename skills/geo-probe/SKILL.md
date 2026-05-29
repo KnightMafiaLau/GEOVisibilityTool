@@ -179,7 +179,7 @@ custom_llms: []      # [{name, url, notes}, ...]
    - 目标品牌 + 常见简写/别名（你自己识别，比如"桥介数物"→"桥介"）
    - 别名的字面出现也计入 mentions
 
-6. **抽引用域名**：`echo "<answer>" | python3 probe.py extract-citations` → 拿到去重的 domain 列表
+6. **抽引用域名**:走第 6.5 节的 **per-LLM Recipe**(操作浏览器点开 sources 面板 + 执行对应 JS extractor → 下载 yaml → Bash 读 → 提取域名);**再**跑 `echo "<answer>" | python3 probe.py extract-citations` 作为兜底,两边合并去重
 7. **品牌识别类（`intent: 品牌识别`）的特殊处理**：
    - LLM 完全没识别（说"不知道"）→ `target_brand` 全 null，notes 写"0 收录"
    - LLM 把品牌**串到另一家同名公司**了 → notes 写明"误识别"（**关键 GEO 信号**），`target_brand.mentions` 仍记字面次数但 sentiment 标 negative
@@ -208,6 +208,151 @@ custom_llms: []      # [{name, url, notes}, ...]
 > - 整个 probe 在这停掉
 
 **不要自作主张跳过。不要硬撑。不要编答案。**
+
+### 6.5 抽 citations —— 必须用 per-LLM Recipe（不再依赖正文 URL 正则）
+
+**关键认知**(2026-05-30 实测验证):
+
+- **中文 LLM 的引用源主要在 sources 面板的 React state 里**,**正文里只有裸名字或裸域名**(如"知乎"、"36氪"、"www.stcn.com",**几乎都不带 `https://` 前缀**)
+- 老 `probe.py extract-citations` 的 URL 正则**对 Qwen / DeepSeek / Kimi / 豆包 全部失效**——只能抓到正文里偶然出现的完整 `https://...`(罕见)
+- 真实数据在 sources 面板,需要**逐 LLM 写抽取脚本**
+
+**新流程**:每条 query 答完 → 按下面 per-LLM recipe 操作浏览器抽 URL → 落入 result block 的 `citations`。**仍同时跑一遍 `probe.py extract-citations` 作为兜底**(抓正文偶然出现的裸 URL,合并去重)。
+
+#### 6.5.1 通用步骤
+
+```
+1. 等回答完整 (status 不再变化)
+2. 找到本 LLM 的 "sources 触发器"(点击按钮 / 自动展开)
+3. 抓到 React state 或 DOM 里的 URL 列表
+4. 用 Blob/download 把列表存盘 → Bash 读 → 提取域名
+   (避免 javascript_tool 返回值被 harness 的 token 屏蔽)
+5. 与 probe.py 兜底结果合并去重
+```
+
+#### 6.5.2 Recipe: Qwen 千问 (`https://chat.qwen.ai`)
+
+- **登录要求**:登录(扫码)。游客无聊天能力
+- **联网搜索**:默认开,无需手动切换
+- **Sources 触发器**:回答末尾的 **`+N`** 按钮(显示 favicon + 数字),点击展开右侧 "搜索来源 · N" 面板
+- **数据位置**:右侧面板的 `.sources-item-wrap` 元素的 React fiber **深度 ~6** 的 `WebSearchOrigins` 组件,`memoizedProps.listData[]` 含完整 `{url, hostname, title, snippet, date}`
+
+JS 提取脚本(在浏览器 console / `javascript_tool` 执行):
+
+```javascript
+(() => {
+  const item = document.querySelector('.sources-item-wrap');
+  if (!item) return { error: 'sources panel not open' };
+  const fk = Object.keys(item).find(k => k.startsWith('__reactFiber'));
+  let f = item[fk]; let d = 0;
+  while (f && d < 30) {
+    if (f.memoizedProps && f.memoizedProps.listData) {
+      const data = f.memoizedProps.listData;
+      const yaml = `total: ${data.length}\nsources:\n` +
+        data.map((s, i) => `  - ${i+1}: ${s.url}`).join('\n');
+      const blob = new Blob([yaml], {type: 'text/yaml'});
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = '_qwen-sources.yaml';
+      a.click();
+      return { total: data.length, downloaded: true };
+    }
+    f = f.return; d++;
+  }
+  return { error: 'listData not found' };
+})()
+```
+
+- **典型产出**:60-90 个完整 URL,40+ 唯一域名
+- **验证**:返回的 `total` 应该 ≥ panel 标题里的 "+N" 数字
+
+#### 6.5.3 Recipe: DeepSeek (`https://chat.deepseek.com`)
+
+- **登录要求**:登录(账号或邮箱)
+- **联网搜索**:输入框下方的 **"智能搜索"** 按钮必须高亮(蓝色) → 否则不联网
+- **Sources 触发器**:回答末尾的 **"N 个网页"** 按钮,点击右侧滑出 "搜索结果" 面板(class `._26c5bc2`)
+- **数据位置**:面板内**标准 `<a href>` 元素**,直接抓即可——最简单
+
+JS 提取脚本:
+
+```javascript
+(() => {
+  const panel = document.querySelector('._26c5bc2');
+  if (!panel) return { error: 'panel not open — click "N 个网页" first' };
+  const anchors = Array.from(panel.querySelectorAll('a[href]'))
+    .filter(a => !a.href.includes('chat.deepseek.com'));
+  const urls = [...new Set(anchors.map(a => a.href))];
+  const yaml = `total: ${urls.length}\nsources:\n` + urls.map((u, i) => `  - ${i+1}: ${u}`).join('\n');
+  const blob = new Blob([yaml], {type: 'text/yaml'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = '_deepseek-sources.yaml';
+  a.click();
+  return { total: urls.length, downloaded: true };
+})()
+```
+
+- **典型产出**:5-15 个 URL(DeepSeek 比 Qwen 引用源更精炼)
+- **注意**:`._26c5bc2` 是 hash class,**Web 版迭代可能变**——如果失效,改用 `[class*="search-result"]` 或找标题"搜索结果"的最近祖先容器
+
+#### 6.5.4 Recipe: Kimi (`https://www.kimi.com`)
+
+- **登录要求**:登录(手机/微信)
+- **联网搜索**:K2.6 快速 / 思考模型默认带搜索;输入 "/" 不需要主动开
+- **Sources 触发器**:回答末尾的 **"引用"** 按钮(旁边带 3-4 个 favicon),点击右侧滑出 "引用来源 N" 面板
+- **数据位置**:面板内**标准 `<a href>`**,但**会混入 Kimi 自家域名**(需黑名单过滤),且 panel 显示数 ≥ 实际可提取 URL 数(部分源是图片/视频/PDF 无 href)
+
+JS 提取脚本:
+
+```javascript
+(() => {
+  const title = Array.from(document.querySelectorAll('*'))
+    .filter(el => el.children.length <= 3 && (el.textContent || '').includes('引用来源') && (el.textContent || '').trim().length < 30)[0];
+  if (!title) return { error: 'panel not open — click "引用" first' };
+  let panel = title.parentElement;
+  while (panel && panel.children.length < 8 && panel.parentElement) panel = panel.parentElement;
+  const blacklist = ['kimi.com', 'moonshot.cn', 'mokahr.com', 'chinaums'];
+  const anchors = Array.from(panel.querySelectorAll('a[href^="http"]'))
+    .filter(a => !blacklist.some(b => a.href.includes(b)));
+  const urls = [...new Set(anchors.map(a => a.href))];
+  const yaml = `total: ${urls.length}\nsources:\n` + urls.map((u, i) => `  - ${i+1}: ${u}`).join('\n');
+  const blob = new Blob([yaml], {type: 'text/yaml'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = '_kimi-sources.yaml';
+  a.click();
+  return { total: urls.length, downloaded: true };
+})()
+```
+
+- **典型产出**:5-12 个 URL(panel 标题数字会更高,差额是无 href 的源)
+- **验证**:如果产出 0,检查 panel 是否真打开了(可能"引用"按钮点错位置)
+
+#### 6.5.5 Recipe: 豆包 Doubao (`https://www.doubao.com`)
+
+- **登录要求**:**必须登录**(手机号/抖音)
+- **联网搜索**:**默认无!** 必须切到 "更多" 菜单里的 **"深入研究"** 模式才有联网;"快速 / 思考 / 专家" 三种基础模式**纯靠模型记忆,不联网**
+- **重要结论**:**游客模式或基础模式下,豆包回答必然 0 引用源**——这不是 probe pipeline 的 bug,是平台不暴露这个能力
+- **Sources 触发器**:深入研究模式下应有引用面板,**待真实数据复测**(本次未实测,因游客模式被弹窗拦截)
+
+**实操建议**:跑豆包 probe 前必须确认两件事:
+- 用户账号已登录
+- 已切到"深入研究"模式(`更多` → `深入研究`)
+
+如果用户不愿登录,**跳过豆包,在 plan.completed 里把它标 `skipped: 平台需登录+深入研究模式`**,不要硬跑——会拿到 0 引用的脏数据污染 analyze。
+
+JS 提取脚本(占位,需登录后实测补完):
+
+```javascript
+// TODO: 豆包深入研究模式实测后补
+(() => { return { error: 'recipe not finalized — log in and run 深入研究 first, then update SKILL.md §6.5.5' }; })()
+```
+
+#### 6.5.6 兜底:`probe.py extract-citations`
+
+按上面 recipe 抽完后,**仍跑一遍** `echo "<answer>" | python3 probe.py extract-citations` 把正文里的裸 URL(罕见但偶尔有)合并进 citations。两边去重后写入 result block。
+
+---
 
 ### 7. 输出格式（`probe.py` 维护，你只需理解 schema）
 
