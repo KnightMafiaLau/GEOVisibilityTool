@@ -1,6 +1,6 @@
 ---
 name: geo-report
-description: 给一份 analysis-<brand>-<date>.md（geo-analyze 的输出），渲染一份给决策人看的对外可读报告 report-<brand>-<date>.md。顾问咨询语调,8 节结构,带 partial 模式强提醒。不出"下一步建议"——那是 geo-channels 的事。纯 skill。
+description: 给一份 analysis-<brand>-<date>.md（geo-analyze 的输出），渲染一份给决策人看的对外可读报告 report-<brand>-<date>.md。顾问咨询语调,7 节结构(TL;DR / 可见度全景 / 品牌识别 / 自然提及 / 竞品格局 / 引用源画像 / 零命中清单),partial 模式强红 banner,竞品反向估算对比表(只比单维指标、不造合成分),per LLM × per intent 引用源偏好诊断。不出"下一步建议"——那是 geo-channels 的事。纯 skill。
 triggers:
   - 出 GEO 报告
   - 生成可见度报告
