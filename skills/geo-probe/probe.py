@@ -6,7 +6,7 @@ Commands:
   wait                          随机等 20-60 秒（防风控）
   init <path>                   创建输出 YAML 文件头
   append <path>                 把一条 result block 原子追加到文件（block 从 stdin 读）
-  extract-citations             从 stdin 抽 URL，输出 YAML citations 列表
+  extract-citations             从 stdin 抽 URL，输出去重的域名 YAML 列表
 """
 import argparse
 import random
@@ -58,21 +58,18 @@ def cmd_append(args):
 
 def cmd_extract_citations(args):
     text = sys.stdin.read()
-    seen, unique = set(), []
+    seen = set()
     for url in URL_RE.findall(text):
         url = url.rstrip(".,;:!?)\"'")
-        if url and url not in seen:
-            seen.add(url)
-            unique.append(url)
-    if not unique:
+        domain = urlparse(url).netloc.lower()
+        if domain:
+            seen.add(domain)
+    if not seen:
         print("citations: []")
         return
     print("citations:")
-    for url in unique:
-        domain = urlparse(url).netloc or "?"
-        print(f"  - url: {url}")
-        print(f"    domain: {domain}")
-        print(f"    title: null   # agent fills if LLM gave one")
+    for domain in sorted(seen):
+        print(f"  - {domain}")
 
 
 def main():

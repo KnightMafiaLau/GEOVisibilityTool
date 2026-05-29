@@ -90,19 +90,39 @@ disable-model-invocation: false
 1. **开新对话**（不要在一个对话里串着问 30 条——会污染上下文，破坏"真实用户单次提问"的测试条件）
 2. 把 `query.text` 原样发过去
 3. 等回答完整出现
-4. 抓回答全文（如果超过 5000 字符就只保留前 5000，标 `truncated: true`）
-5. **语义判断**这条回答里命中了哪些品牌：
-   - 目标品牌（queries.yaml 里的 `brand`）+ 常见简写/别名（你自己识别，比如"桥介数物"→"桥介"）
-   - 每个竞品 + 常见简写
-   - **描述性提及也算**（如"一家专做具身智能小脑的初创"，跟用户品牌画像吻合就算命中）
-   - 每次命中都要给**证据**（抄出回答里的相关句子）
-6. **抽引用源**：`echo "<answer>" | python3 probe.py extract-citations`
+4. **抓回答**：记下字符总数 `answer_chars`，但**不存全文**（省 token；如需复核就重跑）
+5. **生成结构化 summary**（这是这条 result 的核心）：
+
+   **gist**（80-120 字）—— 概括 LLM 说了什么。例："列了 5 家国内向量数据库公司，按团队规模排序，重点推荐 Milvus，次推 Qdrant，简述各自定位与适用场景。"
+
+   **target_brand**（用户品牌，即使 0 提及也要填字段，全 null）：
+   - `mentions`: **字面**出现次数（描述性提及不算 mentions，单独放 notes）
+   - `sentiment`: positive / neutral / negative / null
+     - positive: 被推荐、列为代表玩家、点名优势、进 top N
+     - neutral: 只是被罗列，没褒贬
+     - negative: 被指缺点、被排除、对比时落下风
+     - null: 没提到
+   - `rank`: 对比/推荐类里排第几（1-N）；不适用或没出现就 null
+   - `recommended`: true / false / null
+     - true: 推荐/选型类里被明确推荐
+     - false: 推荐类里被明确排除或缺席
+     - null: 不是推荐类问题
+   - `evidence`: 数组，**抄下所有提到目标品牌的原句**（用户要求保留）
+
+   **other_brands**（其他被提到的品牌，不分竞品/非竞品）—— 每个一项，字段同上但**不含 evidence**
+
+   品牌识别规则：
+   - 目标品牌 + 常见简写/别名（你自己识别，比如"桥介数物"→"桥介"）
+   - 别名的字面出现也计入 mentions
+
+6. **抽引用域名**：`echo "<answer>" | python3 probe.py extract-citations` → 拿到去重的 domain 列表
 7. **品牌识别类（`intent: 品牌识别`）的特殊处理**：
-   - LLM 完全没识别（说"不知道"）→ 在 `notes` 里写明，`mentioned_brands` 设空
-   - LLM 把品牌**串到另一家同名公司**了 → 在 `notes` 里写明这是"误识别"（**关键 GEO 信号**）
+   - LLM 完全没识别（说"不知道"）→ `target_brand` 全 null，notes 写"0 收录"
+   - LLM 把品牌**串到另一家同名公司**了 → notes 写明"误识别"（**关键 GEO 信号**），`target_brand.mentions` 仍记字面次数但 sentiment 标 negative
    - LLM 识别正确 → 正常记
-8. **追加结果**：组装 result block → `echo "<block>" | python3 probe.py append <output>`（每条立刻持久化）
-9. **等下一条**：`python3 probe.py wait --min <X> --max <Y>`（默认 20 / 60；这是 Python `time.sleep`，硬执行）
+8. **描述性提及单独记 notes**（不进 mentions 计数）：如 LLM 说"一家做具身智能小脑的初创"且画像吻合用户品牌，在 notes 里写"描述性提及：'...原句...'"
+9. **追加结果**：组装 result block → `echo "<block>" | python3 probe.py append <output>`（每条立刻持久化）
+10. **等下一条**：`python3 probe.py wait --min <X> --max <Y>`（默认 20 / 60；这是 Python `time.sleep`，硬执行）
 
 ### 5. 失败处理：停下来问用户
 
@@ -139,28 +159,43 @@ results:
     intent: 探索发现
     text: <原问题>
     status: success
-    answer: |
-      <LLM 完整回答，最多 5000 字符>
-    truncated: false
-    mentioned_brands:
-      - name: 桥介数物
-        type: target
-        evidence: "..."
-      - name: 智元
-        type: competitor
-        evidence: "..."
-    citations:
-      - url: https://example.com/article
-        domain: example.com
-        title: "..."
-    notes: null
+    answer_chars: 1247               # 只记长度，不存全文
+
+    summary:
+      gist: |
+        <80-120 字概括 LLM 说了什么>
+      target_brand:
+        mentions: 1                  # 字面出现次数
+        sentiment: positive          # positive / neutral / negative / null
+        rank: 3                      # 对比/推荐类的排名；不适用就 null
+        recommended: true            # true / false / null
+        evidence:                    # 抄下所有提到目标品牌的原句
+          - "桥介数物是一家专注具身智能小脑的初创公司..."
+      other_brands:
+        - name: 智元
+          mentions: 3
+          sentiment: positive
+          rank: 1
+          recommended: true
+        - name: 宇树
+          mentions: 2
+          sentiment: positive
+          rank: 2
+          recommended: true
+
+    citations:                       # 去重的域名列表
+      - 36kr.com
+      - zhihu.com
+
+    notes: null                      # 描述性提及 / 误识别 / 其他特殊情况
 
   - query_id: q017   # 失败的 query 也要记
     intent: 选型推荐
     text: <原问题>
     status: error
     error_message: <具体什么错>
-    answer: null
+    summary: null
+    citations: []
 ```
 
 ### 7. 跑完总结
@@ -194,7 +229,7 @@ python3 probe.py append <path>
   从 stdin 读 YAML 块（必须以 "- " 开头）原子追加到 <path>。
 
 python3 probe.py extract-citations
-  从 stdin 读文本，抽出唯一 URL，输出 YAML citations 列表（含 url / domain / title:null）。
+  从 stdin 读文本，抽出 URL 并提取域名，输出去重排序的域名 YAML 列表。
 ```
 
 ---
@@ -215,32 +250,57 @@ results:
     intent: 探索发现
     text: 国内做具身智能小脑的公司有哪些值得关注？
     status: success
-    answer: |
-      目前国内在具身智能"小脑"方向有几家值得关注：
-      1. 智元机器人 — 由稚晖君创立...
-      2. 宇树科技 — 专注四足/双足...
-    truncated: false
-    mentioned_brands:
-      - name: 智元
-        type: competitor
-        evidence: "智元机器人 — 由稚晖君创立"
-      - name: 宇树
-        type: competitor
-        evidence: "宇树科技 — 专注四足/双足"
+    answer_chars: 842
+    summary:
+      gist: |
+        列了 4 家国内具身智能小脑方向值得关注的公司，按知名度排序，
+        头部点名智元和宇树，简述各自团队背景与技术路线，
+        中间提到星动纪元，未提及桥介数物。
+      target_brand:
+        mentions: 0
+        sentiment: null
+        rank: null
+        recommended: null
+        evidence: []
+      other_brands:
+        - name: 智元
+          mentions: 3
+          sentiment: positive
+          rank: 1
+          recommended: true
+        - name: 宇树
+          mentions: 2
+          sentiment: positive
+          rank: 2
+          recommended: true
+        - name: 星动纪元
+          mentions: 1
+          sentiment: neutral
+          rank: 3
+          recommended: null
     citations:
-      - url: https://36kr.com/p/123
-        domain: 36kr.com
-        title: 国内具身智能赛道盘点
-    notes: null
+      - 36kr.com
+      - zhihu.com
+    notes: |
+      描述性提及：回答提到"一些专注小脑控制器的初创团队"，画像吻合桥介数物
+      但未点名，不计入 mentions。
 
   - query_id: q026   # 品牌识别类
     intent: 品牌识别
     text: 桥介数物是一家什么公司？
     status: success
-    answer: |
-      抱歉，我没有找到"桥介数物"这家公司的可靠信息。
-    truncated: false
-    mentioned_brands: []
+    answer_chars: 78
+    summary:
+      gist: |
+        LLM 表示未找到"桥介数物"这家公司的可靠信息，
+        未给出任何描述或推测，未提及其他公司。
+      target_brand:
+        mentions: 0
+        sentiment: null
+        rank: null
+        recommended: null
+        evidence: []
+      other_brands: []
     citations: []
     notes: |
       LLM 完全没识别到品牌——0 收录。
@@ -256,6 +316,7 @@ results:
 - 不要在一个对话里串问多条（会污染上下文）
 - 不要算分、出报告、做品牌对比——那是 `geo-analyze` / `geo-report` 的事
 - 不要并行跑多个 LLM——一次跑一个，要测多个就调多次
-- 不要把答案截断后假装没截断（必须标 `truncated: true`）
+- 不要存全文（schema 改了，只存 `answer_chars` + summary；想复核就重跑）
+- 不要把描述性提及计入 mentions（mentions 只算字面出现，描述性提及进 notes）
 - **不要绕开 `probe.py wait`**——不要把 `--min --max` 都改成 0 或 < 5
 - **不要自己手写 YAML 追加**——必须走 `probe.py append`（防止格式坏掉）
