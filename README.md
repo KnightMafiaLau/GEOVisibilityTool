@@ -1,7 +1,7 @@
 # GEOVisibilityTool
 
 > **AI 品牌可见度测量与投放策略工具集** · 端到端 GEO(Generative Engine Optimization)分析
-> 6 个 Claude Skills 组成,**测真实 LLM、出可信报告、给可执行投放建议**
+> 6 个模块组成,**测真实 LLM、出可信报告、给可执行投放建议**
 
 [![GitHub](https://img.shields.io/github/stars/KnightMafiaLau/GEOVisibilityTool?style=social)](https://github.com/KnightMafiaLau/GEOVisibilityTool)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
