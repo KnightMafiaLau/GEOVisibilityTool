@@ -155,32 +155,54 @@ q006-q030 的表现拆细:
 - **次级竞品**:出现频次中等但有特定 LLM/intent 集中度的
 - **意外露出**:出现的非主要竞品(用户没列进 competitors 但被模型自然召回的)→ **这是 analyze 已经做了的"其他品牌"列,这里挑 1-2 个有信号的**
 
-#### 节 6:引用源画像 + **per LLM × per intent 来源偏好**(用户要求加)
+#### 节 6:引用源画像(channel-level + article-level + intent 偏好)
 
-**6.1 全局 top 域名**(分平台来说,模型主要从哪些站取信息):
+**前提认知**:`citations` 字段是 URL 级数据(同域名多 URL 全保留,同 URL 多次出现也保留)。这一节有 **3 个子表**,各回答不同的投放策略问题:
 
-| 域名 | 总出现次数 | 主要 intent | 出现 LLM |
-|---|---|---|---|
-| 36kr.com | 18 | 探索发现 / 选型推荐 | Kimi, 豆包 |
-| zhihu.com | 12 | 选型推荐 | Kimi, DeepSeek |
-| ...(top 15) | | | |
+**6.1 全局 top 15 域名(channel-level — 哪些站值得系统投放)**:
 
-**6.2 各 LLM 在不同 intent 上的来源偏好**(这是用户特别要求的诊断维度):
+| 域名 | 总出现次数 | 不同 URL 数 | 覆盖比 | 渠道类型 | 主要 intent | 出现 LLM |
+|---|---|---|---|---|---|---|
+| smzdm.com | 18 | 14 | 0.78 | **广覆盖** | 选型/对比 | Kimi, DeepSeek |
+| 36kr.com | 14 | 5 | 0.36 | 中度集中 | 探索/采购 | Kimi, 豆包 |
+| zhihu.com | 12 | 2 | 0.17 | **单篇热文** | 选型推荐 | Kimi, DeepSeek |
 
-按 LLM 分小节,每个小节列该 LLM 在各 intent 类型下的 top 3-5 引用域名。
+**解读规则**(必须写进报告):
+- **覆盖比 ≥ 0.6 / 渠道类型 = "广覆盖"** → 该站是 channel,模型在该站读过多篇不同内容。投放策略:系统性持续产内容,把这个站做成"高密度自有内容池"
+- **覆盖比 < 0.3 / 渠道类型 = "单篇热文"** → 该站是 anchor,模型反复回头看的可能是某一篇高赞答案 / 测评。投放策略:**先去看 6.2 节那篇 URL 是什么**,反向工程它的角度+质量
+- **中度集中**:两者之间,需要看具体 URL
+
+不要只看域名 appearances 排名;**忽略覆盖比 = 把"系统投放"和"反向工程一篇文章"两种完全不同的策略混成一种**。
+
+**6.2 高频 URL top 10(article-level — 哪些具体文章是 canonical source)**:
+
+| URL | 域名 | 被引次数 | 出现于 query | 出现 LLM |
+|---|---|---|---|---|
+| https://zhihu.com/question/598234/answer/.. | zhihu.com | 8 | q006/q007/q012 | Kimi, DeepSeek |
+| https://smzdm.com/p/3d-printer-2026-buy | smzdm.com | 5 | q008/q009 | Kimi |
+
+**解读规则**(必须写进报告):这些是"垂类内 LLM 反复回头看的源",**是 GEO 反向工程的核心对象**——不是简单加自己的内容,而是分析"为什么是这一篇"(标题角度?数据点?发布平台?作者权威?发布时间?),然后:
+- 复刻该角度但更深 / 更新
+- 或想办法让自己被这一篇引用
+
+如果 top 10 里 appearances 都 ≤ 1(分析阶段已标出),写一句"无明显 canonical URL,LLM 对每条 query 都搜不同内容,该垂类是广度型搜索行为,投放思路偏 6.1 而非反向工程"。
+
+**6.3 各 LLM 在不同 intent 上的来源偏好(intent-channel 矩阵)**:
+
+按 LLM 分小节,每个小节列该 LLM 在各 intent 类型下的 top 3-5 域名,**并标出每个域名下被引最多的具体 URL**。这一节是节 6.1(channel)和节 6.2(article)的 cross-tab。
 
 **示例**(假设 Kimi):
 
 > ##### Kimi
-> - **探索发现 类**:36kr.com (8) / zhihu.com (5) / sohu.com (3) — 偏综合科技媒体 + 问答社区
-> - **选型推荐 类**:zhihu.com (10) / bilibili.com (6) / chiphell.com (4) — 偏垂直评测 + 用户社区
+> - **探索发现 类**:36kr.com (8, hot: `36kr.com/p/2745881` × 3) / zhihu.com (5) / sohu.com (3) — 偏综合科技媒体 + 问答社区;36 氪那一篇是该类问题的 anchor
+> - **选型推荐 类**:smzdm.com (10, hot: `smzdm.com/p/3d-printer-2026-buy` × 4) / bilibili.com (6) / chiphell.com (4) — 偏垂直评测;**那篇 smzdm 2026 选型攻略是 Kimi 该类问题的 canonical 引用,值得逐字研究角度**
 > - **对比评估 类**:bilibili.com (5) / b23.tv (3) — 视频评测占主导
-> - **了解原理 类**:csdn.net (4) / 知乎专栏 (3) — 偏技术博客
-> - **采购/投资 类**:36kr.com (5) / 投资界类站(2) — 偏行业媒体
+> - **了解原理 类**:csdn.net (2) — 数据稀疏,暂无明显偏好
+> - **采购/投资 类**:36kr.com (5) / 投资界类站 (2) — 偏行业媒体
 >
-> **诊断**:Kimi 在选型决策类问题上明显倾向**垂直评测内容**(知乎深度评测、Bilibili 测评、Chiphell 等硬件社区);要提升 Kimi 端选型问题命中,**优先投入这类垂直评测渠道**。
+> **诊断**:Kimi 在选型决策类问题上**明显锚定 smzdm 单篇热文 + 垂直评测站**;要提升 Kimi 端选型问题命中,**先研究那篇 smzdm 攻略的角度和数据点**(article-level 反向工程),再考虑系统性投放 bilibili 测评 / chiphell 硬件社区(channel-level)。
 
-(其余 LLM 同样格式,**逐个写**——这是本节的核心价值,**不允许偷懒只写 1-2 个 LLM**)
+(其余 LLM 同样格式,**逐个写**——**不允许偷懒只写 1-2 个 LLM**)
 
 如果某 LLM 在某 intent 类引用源 < 3 条(数据稀疏),写"该 intent 数据稀疏,暂无明显偏好"。
 
@@ -427,10 +449,12 @@ report_version: v1
 <对比表 + 诚实声明 + 头号/次级/意外露出>
 
 ## 5. 引用源画像
-### 5.1 全局 top 域名
-<表>
-### 5.2 各 LLM 的 intent-source 偏好
-<每个 LLM 一小节,逐个列>
+### 5.1 全局 top 15 域名(channel-level)
+<表;含 不同 URL 数 / 覆盖比 / 渠道类型 列;附"广覆盖 vs 单篇热文"解读规则>
+### 5.2 高频 URL top 10(article-level — canonical sources)
+<表;如果都 ≤ 1 次写一句"无明显 canonical URL">
+### 5.3 各 LLM 的 intent-source 偏好(channel × article 矩阵)
+<每个 LLM 一小节,逐个列;每个域名旁边标 hot URL 和被引次数>
 
 ## 6. 高价值零命中清单(top 10)
 <每条一段,展开>
