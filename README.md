@@ -3,8 +3,9 @@
 > **AI 品牌可见度测量与投放策略工具集** · 端到端 GEO(Generative Engine Optimization)分析
 > 6 个 Claude Skills 组成,**测真实 LLM、出可信报告、给可执行投放建议**
 
-[![GitHub](https://img.shields.io/github/stars/KnightMafiaLau/geo-harness?style=social)](https://github.com/KnightMafiaLau/geo-harness)
-[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![GitHub](https://img.shields.io/github/stars/KnightMafiaLau/GEOVisibilityTool?style=social)](https://github.com/KnightMafiaLau/GEOVisibilityTool)
+[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
+[![Attribution](https://img.shields.io/badge/Attribution-Required-orange.svg)](NOTICE)
 
 ---
 
@@ -200,7 +201,7 @@ Phase 6: geo-channels → channels.{md,html}(自动打开)
 
 ```bash
 # 克隆仓库
-git clone https://github.com/KnightMafiaLau/geo-harness.git GEOVisibilityTool
+git clone https://github.com/KnightMafiaLau/GEOVisibilityTool.git
 cd GEOVisibilityTool
 
 # 装到 Claude 的 skills 目录(6 个模块)
@@ -299,12 +300,46 @@ my-brand/
 
 ---
 
-## 七、License
+## 七、License 与 Attribution
 
-MIT License — 自由使用、修改、分发,需保留作者署名(`KnightMafiaLau`)。
+本项目采用 **Apache License 2.0**(完整文本见 [LICENSE](LICENSE)),附 [NOTICE](NOTICE) 文件说明 attribution 义务。
 
-报告 HTML 输出**内嵌强制水印**作为 open-source attribution,无论使用场景均保留。详见 `skills/geo-report/SKILL.md` 与 `skills/geo-channels/SKILL.md` 的水印红线条款。
+### ✅ 您可以(自由)
+
+- **自由使用** — 包括商业用途
+- **修改 / 二次开发** — 适配、fork、定制
+- **分发** — 原版或修改版
+- **商业化变现** — 基于本项目开发付费服务或商业产品
+
+### ⚠️ 您必须(强制)
+
+1. **保留原作者署名 `KnightMafiaLau`**
+   - 任何分发的源代码必须保留 `LICENSE` 和 `NOTICE` 文件
+   - 任何衍生的用户文档必须注明原始来源(本仓库 URL)
+   - 任何引用本方法论的文章 / 演讲 / 商业资料必须给出 attribution
+
+2. **绝不移除或修改 HTML 报告中的水印**
+   `GEOVisibilityTool · KnightMafiaLau` 是独立于 license notice 的 attribution 机制。
+   - 移除水印 = attribution 违约
+   - 修改水印文本 = attribution 违约
+   - 替换为自家水印 = attribution 违约
+   - **您可以**在原水印旁加上自家组织 logo,但**不能**替换或隐藏原水印
+
+3. **明确声明修改**(Apache 2.0 §4(b))
+   分发修改版本时,必须明确标注您修改了哪些部分,防止下游用户误以为是原版。
+
+### 强制声明
+
+> 本工具集 (`GEOVisibilityTool`) 由 **KnightMafiaLau** 创建并持续维护。
+>
+> 任何使用、修改、分发、商业化本工具或其衍生产物的行为,均必须明确注明:
+>
+> > **"基于 GEOVisibilityTool(作者:KnightMafiaLau,
+> > https://github.com/KnightMafiaLau/GEOVisibilityTool)"**
+>
+> 该署名要求适用于代码层(源码 NOTICE 文件)、文档层(技术文章 / 演讲 / 商业资料)、
+> 以及产物层(HTML 报告内嵌水印)三个维度。任一维度的 attribution 缺失均视为违反 Apache 2.0 §4 条款。
 
 ---
 
-<sub>**GEOVisibilityTool** · 由 [KnightMafiaLau](https://github.com/KnightMafiaLau) 创建与维护 · 问题反馈与 PR 欢迎</sub>
+<sub>**GEOVisibilityTool** · Copyright © 2026 [KnightMafiaLau](https://github.com/KnightMafiaLau) · Apache License 2.0 · 问题反馈与 PR 欢迎</sub>
