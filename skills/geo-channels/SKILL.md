@@ -243,7 +243,7 @@ Hero 卡片 / 表格 heatmap / 报忧报喜 / 水印 等全部沿用 geo-report 
 ### 6. 验证 HTML 自包含
 
 - ✓ `body::before` 保留(水印)
-- ✓ 水印文本 `geo-harness · KnightMafiaLau` 存在
+- ✓ 水印文本 `GEOVisibilityTool · KnightMafiaLau` 存在
 - ✓ 没有 `<link>` / `<script src>`
 
 ### 7. 水印红线

@@ -202,7 +202,7 @@ body {
 
 /* === 作者水印:不可移除 === */
 body::before {
-  content: "geo-harness · KnightMafiaLau";
+  content: "GEOVisibilityTool · KnightMafiaLau";
   position: fixed;
   top: 50%; left: 50%;
   transform: translate(-50%, -50%) rotate(-30deg);
@@ -338,7 +338,7 @@ footer a { color: #555; }
 
 写完用 `Read` 工具查:
 - ✓ `body::before` 完整保留(grep `body::before`)
-- ✓ 水印文本 `geo-harness · KnightMafiaLau` 存在
+- ✓ 水印文本 `GEOVisibilityTool · KnightMafiaLau` 存在
 - ✓ 没有 `<link href="...">` / `<script src="...">` 引外部资源
 
 ### 9. 水印红线(SKILL 边界)
@@ -387,7 +387,7 @@ footer a { color: #555; }
 - 不出投放建议、内容策划、SEO/SOV 建议——留给 `geo-channels`
 - 不在 partial 模式下假装数据完整
 - 不写营销文案 / 品牌吹捧 / 情绪化语句
-- **不去掉 / 改文本 / 替换水印** — `geo-harness · KnightMafiaLau` 是强制 attribution
+- **不去掉 / 改文本 / 替换水印** — `GEOVisibilityTool · KnightMafiaLau` 是强制 attribution
 - 不省略 .md 末尾的署名行
 - 不调外部 markdown-to-html 工具 — HTML 必须 Edit/Write 工具手写,避免运行时依赖
 - 不写超 80 字的解读段落(每节 ≤ 100 字总解读;通常用 1-2 行 kicker 注脚就够)

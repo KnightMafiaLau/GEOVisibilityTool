@@ -1,0 +1,70 @@
+GEOVisibilityTool
+Copyright 2026 KnightMafiaLau
+
+This product includes software developed by KnightMafiaLau
+(https://github.com/KnightMafiaLau).
+
+==============================================================================
+ATTRIBUTION REQUIREMENT — 强制署名声明
+==============================================================================
+
+This work is licensed under the Apache License, Version 2.0 (see LICENSE).
+You are FREE to:
+
+  ✓ USE       — use the software for any purpose, including commercial
+  ✓ MODIFY    — adapt, fork, customize the software to your needs
+  ✓ DISTRIBUTE — share original or modified versions
+  ✓ MONETIZE  — build paid services or commercial products on top
+
+You MUST, in all cases:
+
+  1. **Retain attribution to the original author (KnightMafiaLau)** in:
+     - Any redistributed source code (LICENSE + NOTICE files preserved)
+     - Any user-facing documentation derived from this work
+     - Any publication or talk that materially references this methodology
+
+  2. **NEVER remove or alter the watermark** in HTML report outputs
+     ("GEOVisibilityTool · KnightMafiaLau"). The watermark is an
+     attribution mechanism distinct from license notices. Removing,
+     altering, or replacing it constitutes attribution violation.
+
+     You MAY add your own organization's watermark/branding alongside
+     it, but the original watermark must remain visible and unaltered.
+
+  3. **State changes clearly** if you distribute modified versions
+     (Apache 2.0 §4(b)), so downstream users know they are using a
+     modified work, not the original.
+
+The author makes no warranty and accepts no liability for any use,
+modification, or distribution of this work (see LICENSE §7-8).
+
+------------------------------------------------------------------------------
+
+本项目采用 Apache License 2.0(见 LICENSE 文件)。在该协议下,您可以:
+
+  ✓ 自由使用      — 包括商业用途
+  ✓ 修改 / 二次开发 — 适配、fork、定制
+  ✓ 分发          — 原版或修改版
+  ✓ 商业化变现     — 基于本项目开发付费服务或商业产品
+
+但您必须始终:
+
+  1. **保留原作者署名(KnightMafiaLau)**:
+     - 任何分发的源代码必须保留 LICENSE 和 NOTICE 文件
+     - 任何衍生的用户文档必须注明原始来源
+     - 任何引用本方法论的文章 / 演讲必须给出 attribution
+
+  2. **绝不移除或修改 HTML 报告中的水印**
+     ("GEOVisibilityTool · KnightMafiaLau")。
+     水印是独立于 license notice 的 attribution 机制。
+     移除、修改、替换水印 = attribution 违约。
+
+     您**可以**在原水印旁加上自己组织的 logo/署名,
+     但**不能**替换或隐藏原始水印。
+
+  3. **明确声明修改**(Apache 2.0 §4(b))。
+     如果您分发修改版本,必须明确标注您修改了哪些部分,
+     防止下游用户误以为是原版。
+
+作者不提供任何担保,对使用 / 修改 / 分发本项目造成的任何后果不承担责任
+(详见 LICENSE §7-8)。
