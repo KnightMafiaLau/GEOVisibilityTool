@@ -328,7 +328,7 @@ my-brand/
 >
 > 任何使用、修改、分发、商业化本工具或其衍生产物的行为,均必须明确注明:
 >
-> > **"基于 GEOVisibilityTool(作者:KnightMafiaLau,
+> > **"基于 GEOVisibilityTool(作者:户田雅诗,
 > > https://github.com/KnightMafiaLau/GEOVisibilityTool)"**
 >
 > 该署名要求适用于代码层(源码 NOTICE 文件)、文档层(技术文章 / 演讲 / 商业资料)、
