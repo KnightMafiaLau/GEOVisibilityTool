@@ -28,6 +28,23 @@ disable-model-invocation: false
 
 ### 1. 先拿到输入 + 处理 probe-plan.yaml（**关键：每个测试 run 的"账本"**）
 
+#### 1.0 同步 canonical probe.py(**绝对前提,不准跳**)
+
+每次进 skill,**第一件事**是把 canonical 的 probe.py 同步到测试目录:
+
+```bash
+cp ~/.claude/skills/geo-probe/probe.py <测试目录>/probe.py
+```
+
+**为什么必须做**:测试目录里可能残留旧版 probe.py(之前手改过、复制过、或不同 schema 版本)。本地旧版 probe.py 的 docstring 和行为可能跟当前 SKILL.md 不一致——agent 跟着旧 docstring 走 = 静默用错 schema(bambulab v3 实测踩过这个坑,citations 写成域名不是 URL)。
+
+**校验同步成功**(开跑前必须跑):
+
+```bash
+grep -c "URL 列表(不去重" <测试目录>/probe.py
+# 必须输出 1,否则 cp 没生效,停手
+```
+
 #### 1.1 基本输入
 
 1. **queries.yaml**（路径或粘贴内容）——schema 要符合 geo-queries 的输出
@@ -593,5 +610,6 @@ results:
 - 不要把描述性提及计入 mentions（mentions 只算字面出现，描述性提及进 notes）
 - **不要绕开 `probe.py wait`**——不要把 `--min --max` 都改成 0 或 < 5
 - **不要自己手写 YAML 追加**——必须走 `probe.py append`（防止格式坏掉）
+- **不要使用测试目录里残留的旧 probe.py**——开跑前**必须** `cp ~/.claude/skills/geo-probe/probe.py <测试目录>/`(见第 1.0 节)。本地版本的 docstring 可能与 SKILL.md 已规定的 schema 不同步,跟着旧 docstring 走 = 静默用错 schema
 - **不要跳过 `probe.py log`**——每条 query 抽完 citations **必须** log 一次。少 log 一条,verify-log 就抓不到"recipe 没真跑"的证据
 - **不要在 verify-log 报 ⚠ ANOMALIES 时静默继续**——必须按第 8 步硬规则报给用户,让用户决定 a/b/c
