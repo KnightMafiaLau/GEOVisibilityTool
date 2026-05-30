@@ -8,13 +8,10 @@ from urllib.parse import urlparse
 
 URL_RE = re.compile(r"https?://[^\s<>\"\)\]]+")
 
-# 每个 LLM citations 时,每条 query 至少应有多少条 URL(低于此数 = recipe 没真跑或 panel 没开)
-# 这是 citations 列表的"条数"阈值;citations 现在存 URL(不去重),所以阈值参照 panel 典型 N
+# 每 LLM 每 query citations 最低应有条数(低 = recipe 没跑或 panel 没开)。0 = 不报警
 EXPECTED_MIN_CITATIONS = {
-    "Qwen": 5, "qwen": 5, "千问": 5,         # panel 典型 60-90
-    "DeepSeek": 3, "deepseek": 3,           # panel 典型 10
-    "Kimi": 2, "kimi": 2,                    # panel 典型 9(部分非 link)
-    "豆包": 0, "Doubao": 0, "doubao": 0,    # 0 = 默认无联网,不报警
+    "Qwen": 5, "qwen": 5, "千问": 5, "DeepSeek": 3, "deepseek": 3,
+    "Kimi": 2, "kimi": 2, "豆包": 0, "Doubao": 0, "doubao": 0,
 }
 
 
@@ -43,6 +40,21 @@ def cmd_append(args):
     block = sys.stdin.read().rstrip()
     if not block.startswith("- "):
         sys.exit("[append] block must start with '- ' (YAML list item)")
+    if args.citations_from:  # 从文件注入 citations(URL 不进 chat,防 sanitizer)
+        urls, seen = [], set()
+        for f in args.citations_from:
+            for u in URL_RE.findall(Path(f).read_text(encoding="utf-8")):
+                u = u.rstrip(".,;:!?)\"'")
+                if u and u not in seen:
+                    seen.add(u); urls.append(u)
+        cite = "  citations:\n" + "\n".join(f"    - {u}" for u in urls) if urls else "  citations: []"
+        if "  citations: !INJECT!" in block:
+            block = block.replace("  citations: !INJECT!", cite)
+        elif "\n  notes:" in block:
+            block = block.replace("\n  notes:", "\n" + cite + "\n  notes:", 1)
+        else:
+            block = block.rstrip() + "\n" + cite
+        print(f"[append] injected {len(urls)} URLs from {len(args.citations_from)} file(s)", file=sys.stderr)
     existing = path.read_text(encoding="utf-8").rstrip()
     tmp = path.with_suffix(path.suffix + ".tmp")
     tmp.write_text(existing + "\n" + block + "\n", encoding="utf-8")
@@ -50,16 +62,12 @@ def cmd_append(args):
     print(f"[append] appended to {path}", file=sys.stderr)
 
 
-def cmd_extract_citations(args):
-    # 输出 URL 列表(不去重 — 同一 URL 出现多次 = 信号:模型多次引用)
-    # 同一域名多个 URL 也保留(下游 analyze 用 urlparse(u).netloc 现算频次)
-    urls = [u.rstrip(".,;:!?)\"'") for u in URL_RE.findall(sys.stdin.read())]
-    urls = [u for u in urls if u]
+def cmd_extract_citations(args):  # 输出 URL 列表;不去重(同 URL 多次=信号)
+    urls = [u for u in (x.rstrip(".,;:!?)\"'") for x in URL_RE.findall(sys.stdin.read())) if u]
     if not urls:
         print("citations: []"); return
     print("citations:")
-    for u in urls:
-        print(f"  - {u}")
+    for u in urls: print(f"  - {u}")
 
 
 def cmd_log(args):
@@ -118,7 +126,10 @@ def main():
     pi.add_argument("--total", type=int, required=True)
     pi.add_argument("--overwrite", action="store_true"); pi.set_defaults(func=cmd_init)
 
-    pa = sub.add_parser("append"); pa.add_argument("path"); pa.set_defaults(func=cmd_append)
+    pa = sub.add_parser("append"); pa.add_argument("path")
+    pa.add_argument("--citations-from", action="append", default=[],
+                    help="读文件抽 URL 注入到 block 的 citations 字段(防 chat sanitizer);可多次")
+    pa.set_defaults(func=cmd_append)
     pe = sub.add_parser("extract-citations"); pe.set_defaults(func=cmd_extract_citations)
 
     pl = sub.add_parser("log"); pl.add_argument("path")

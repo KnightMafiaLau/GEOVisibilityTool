@@ -196,16 +196,31 @@ custom_llms: []      # [{name, url, notes}, ...]
    - 目标品牌 + 常见简写/别名（你自己识别，比如"桥介数物"→"桥介"）
    - 别名的字面出现也计入 mentions
 
-6. **抽 citations**(两步,**citations 字段现在存 URL,不存域名,且不去重**——同一域名多个 URL 全保留,这是"该渠道值得多投放"的信号源):
-   a. 走第 6.5 节的 **per-LLM Recipe**:操作浏览器点开 sources 面板 → 执行对应 JS extractor → 下载 yaml → Bash 读 → 直接拿 URL 列表(不要 `urlparse` 提域名)
-   b. 兜底:`echo "<answer>" | python3 probe.py extract-citations` 抓正文里偶现的裸 URL(也是输出 URL 不是域名)。两边合并(URL 级去重——同一 URL 重复出现只算 1 次;但同域名多个 URL 全保留)
-   c. **强制日志**(便于 verify-log 排查):
+6. **抽 citations**(**URL 必须全程走文件,不进 chat**——防 sanitizer 吃带 token 的 URL):
+   a. 走第 6.5 节的 **per-LLM Recipe**:操作浏览器点开 sources 面板 → 执行对应 JS extractor → **触发文件下载**(下载位置如 `~/Downloads/_deepseek-sources.yaml`)
+   b. 兜底:`echo "<answer>" | python3 probe.py extract-citations > /tmp/_fallback.yaml` 把正文里偶现的裸 URL 也存到文件
+   c. **assemble 时 citations 字段用 `!INJECT!` 占位符**,让 `probe.py append` 从文件注入(不要在 chat 里列 URL,**这一步是防 sanitizer 关键**):
+      ```bash
+      cat <<'BLOCK' | python3 probe.py append <output.yaml> \
+        --citations-from ~/Downloads/_deepseek-sources.yaml \
+        --citations-from /tmp/_fallback.yaml
+      - query_id: q006
+        intent: 选型推荐
+        text: ...
+        ...
+        citations: !INJECT!
+        notes: null
+      BLOCK
+      ```
+      Python 自动从 `--citations-from` 文件抽 URL、URL 级去重、注入到 `!INJECT!` 占位符。**URLs 全程在文件 IO 路径,不经过 chat**——`leiphone.com/.../CH82qEwdHA50txA1.html` 这种 JWT-like URL 也安全保留。
+
+   d. **强制日志**(便于 verify-log 排查):
       ```
       python3 probe.py log <log-path> \
         --qid q006 --intent 选型推荐 --llm DeepSeek --recipe deepseek \
         --panel-opened true --urls-found 10 --domains-unique 10
       ```
-      `--urls-found` = panel 里看到多少条原始 URL;`--domains-unique` = **最终写入 citations 的条数**(语义已变成"citations 列表长度",名字保留向后兼容;agent 直接传 `len(citations)`)。`log-path` = `probe-log-<llm-slug>-<date>.jsonl`,与 probe-results 同目录。**每条 query 必须 log 一次**——这是 verify-log 排查"recipe 没真跑"的唯一证据,绕过它 = 数据污染
+      `--urls-found` = panel 里看到多少条原始 URL;`--domains-unique` = 最终写入 citations 的条数(agent 可以从 stderr 输出的 `[append] injected N URLs` 取这个数,不需要再读 yaml)。`log-path` = `probe-log-<llm-slug>-<date>.jsonl`。**每条 query 必须 log 一次**——这是 verify-log 排查"recipe 没真跑"的唯一证据,绕过它 = 数据污染
 7. **品牌识别类（`intent: 品牌识别`）的特殊处理**：
    - LLM 完全没识别（说"不知道"）→ `target_brand` 全 null，notes 写"0 收录"
    - LLM 把品牌**串到另一家同名公司**了 → notes 写明"误识别"（**关键 GEO 信号**），`target_brand.mentions` 仍记字面次数但 sentiment 标 negative
@@ -501,8 +516,11 @@ python3 probe.py init <path> --brand <X> --llm <Y> --total <n> \
                    --probed-at <ts> --probed-by <tool> [--overwrite]
   创建输出文件，写头部。
 
-python3 probe.py append <path>
-  从 stdin 读 YAML 块（必须以 "- " 开头）原子追加到 <path>。
+python3 probe.py append <path> [--citations-from <file>] [--citations-from <file>] ...
+  从 stdin 读 YAML 块(必须以 "- " 开头)原子追加到 <path>。
+  --citations-from 选项:从指定文件抽 URL(用 URL_RE),URL 级去重,
+    注入到 block 的 "citations: !INJECT!" 占位符处。可重复多次合并多个文件。
+    这条路径让 URL 全程不进 chat,**防 sanitizer 屏蔽 token-like URL**。
 
 python3 probe.py extract-citations
   从 stdin 读文本，抽出 URL，输出 URL 列表(不去重——同 URL 出现多次保留多次,与正文一致)。
@@ -613,3 +631,4 @@ results:
 - **不要使用测试目录里残留的旧 probe.py**——开跑前**必须** `cp ~/.claude/skills/geo-probe/probe.py <测试目录>/`(见第 1.0 节)。本地版本的 docstring 可能与 SKILL.md 已规定的 schema 不同步,跟着旧 docstring 走 = 静默用错 schema
 - **不要跳过 `probe.py log`**——每条 query 抽完 citations **必须** log 一次。少 log 一条,verify-log 就抓不到"recipe 没真跑"的证据
 - **不要在 verify-log 报 ⚠ ANOMALIES 时静默继续**——必须按第 8 步硬规则报给用户,让用户决定 a/b/c
+- **不要让 URL 经过 chat 文本输出**——assemble result block 时 citations 字段写 `!INJECT!` 占位符,让 `probe.py append --citations-from` 注入。在 chat 里 `cat` URL 列表 / 列出"采到的 URL: 1. ... 2. ..."给用户看 = 触发 sanitizer 误屏蔽 token-like URL → 静默丢数据(bambulab v3 q002 实测踩过,gap=2)
