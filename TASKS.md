@@ -35,14 +35,18 @@ custom_llms: []                              # 自定义 LLM 的 name/url/notes
 - [x] **模块 4：`geo-report`** — 把 `analysis-<brand>-<date>.md` 渲染成给 CEO 看的报告。**双输出 .md + .html**(自包含、内嵌水印、可 Cmd+P 存 PDF)。**Topify-CEO 风格**:Hero 卡片 + 颜色编码矩阵 + 报忧/报喜双卡片 + 极少叙述。10 节结构,partial 强红 banner,竞品简化 visibility 公开公式。**不出"下一步建议"——投放策略留给 geo-channels**。纯 skill。
       → `skills/geo-report/SKILL.md`
 
-- [x] **模块 5:`geo-channels`** — 把 analysis(+ optional report)翻译成 **actionable 投放建议**。**双输出 .md + .html**,沿用 Topify-CEO 风格。**7 节结构**:Hero / 🔥 紧急处理(负面/误识别 priority) / 优先 channel top 10 grid(带 ROI + 形态 pill) / Per-LLM 适配(内容+渠道双维度) / 竞品反位攻关 / 零命中攻关。ROI 定性 high/med/low 公开公式。投放形态 mapping(知乎专栏→深度文,smzdm→购买决策,B 站→视频,谷歌专利→技术解析 等 14 类)。**不给具体 content brief / 不算定量 ROI / 不出投放预算**——边界严格止于"该投哪 + 什么形态 + 优先级"。纯 skill。
+- [x] **模块 5:`geo-channels`** — 把 analysis(+ optional report)翻译成 **actionable 投放建议**。**双输出 .md + .html**,沿用 Topify-CEO 风格。**7 节结构**:Hero / 🔥 紧急处理(负面/误识别 priority) / 优先 channel top 10 grid(带 ROI + 形态 pill) / Per-LLM 适配(内容+渠道双维度) / 竞品反位攻关 / 零命中攻关。ROI 定性 high/med/low 公开公式。投放形态 mapping(知乎专栏→深度文,smzdm→购买决策,B 站→视频,谷歌专利→signal-非channel 等 14 类)。**剔除规则**:竞品官网 + 搜索引擎/索引类站不进 channel grid。**不给具体 content brief / 不算定量 ROI / 不出投放预算 / 不写 timeline 拆分**——边界严格止于"该投哪 + 什么形态 + 主题"。纯 skill。
       → `skills/geo-channels/SKILL.md`
+
+- [x] **模块 6(拼合):`geo-harness`** — 总入口编排,串起前 5 个。**一句话触发,6 phase + 5 个 checkpoint**:Phase 1 拿品牌信息→geo-queries / Phase 2 写 probe-plan / Phase 3 对每个 LLM 调 geo-probe / Phase 4 geo-analyze / Phase 5 geo-report(自动打开 html) / Phase 6 geo-channels(自动打开 html)。**支持断点续跑**——从测试目录现有文件状态推断当前阶段。**所有 sub-skill 通过 Skill tool 调用,不复制逻辑**。失败绝不自动重试。同目录假设硬约束。纯 skill。
+      → `skills/geo-harness/SKILL.md`
 
 ## 进行中
 
 （暂无）
 
 ## 待定（按顺序）
-- [ ] **模块 6(拼合):`geo-harness`** — 串起前 5 个的总入口 skill。用户一句话触发整条流程,每个 checkpoint 都要用户确认才进下一步。**基于 `probe-plan.yaml` 编排**——不重新设计状态机;harness 只是按 plan 调度 probe 多次 + 一次 analyze + 一次 report + 一次 channels,并在每个阶段间走用户确认门。
+
+(全部模块 v2 完成)
 
 每做完一个模块都先单独跑通，再拼下一个。
