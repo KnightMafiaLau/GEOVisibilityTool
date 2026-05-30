@@ -1,44 +1,37 @@
-"""geo-probe helpers — 机械活只在这。
+"""geo-probe helpers — 机械活只在这。Stdlib only. 判断归 SKILL.md.
 
-Stdlib only. 判断和编排归 SKILL.md。
-
-Commands:
-  wait                          随机等 20-60 秒（防风控）
-  init <path>                   创建输出 YAML 文件头
-  append <path>                 把一条 result block 原子追加到文件（block 从 stdin 读）
-  extract-citations             从 stdin 抽 URL，输出去重的域名 YAML 列表
+Commands: wait | init | append | extract-citations | log | verify-log
 """
-import argparse
-import random
-import re
-import sys
-import time
+import argparse, json, random, re, sys, time
 from pathlib import Path
 from urllib.parse import urlparse
 
 URL_RE = re.compile(r"https?://[^\s<>\"\)\]]+")
 
+# 每个 LLM citations 时,每条 query 至少应有多少唯一域名(低于此数 = 异常)
+EXPECTED_MIN_DOMAINS = {
+    "Qwen": 5, "qwen": 5, "千问": 5,
+    "DeepSeek": 3, "deepseek": 3,
+    "Kimi": 2, "kimi": 2,
+    "豆包": 0, "Doubao": 0, "doubao": 0,  # 0 = 默认无联网,不报警
+}
+
 
 def cmd_wait(args):
-    seconds = random.uniform(args.min, args.max)
-    print(f"[wait] sleeping {seconds:.1f}s before next query...", file=sys.stderr)
-    time.sleep(seconds)
-    print(f"{seconds:.1f}")
+    s = random.uniform(args.min, args.max)
+    print(f"[wait] sleeping {s:.1f}s before next query...", file=sys.stderr)
+    time.sleep(s)
+    print(f"{s:.1f}")
 
 
 def cmd_init(args):
     path = Path(args.path)
     if path.exists() and not args.overwrite:
         sys.exit(f"[init] {path} exists; use --overwrite")
-    path.write_text(
-        f"brand: {args.brand}\n"
-        f"target_llm: {args.llm}\n"
-        f"probed_at: {args.probed_at}\n"
-        f"probed_by: {args.probed_by}\n"
-        f"queries_total: {args.total}\n"
-        f"\nresults:\n",
-        encoding="utf-8",
-    )
+    head = (f"brand: {args.brand}\ntarget_llm: {args.llm}\n"
+            f"probed_at: {args.probed_at}\nprobed_by: {args.probed_by}\n"
+            f"queries_total: {args.total}\n\nresults:\n")
+    path.write_text(head, encoding="utf-8")
     print(f"[init] created {path}", file=sys.stderr)
 
 
@@ -57,46 +50,85 @@ def cmd_append(args):
 
 
 def cmd_extract_citations(args):
-    text = sys.stdin.read()
     seen = set()
-    for url in URL_RE.findall(text):
-        url = url.rstrip(".,;:!?)\"'")
-        domain = urlparse(url).netloc.lower()
-        if domain:
-            seen.add(domain)
+    for url in URL_RE.findall(sys.stdin.read()):
+        d = urlparse(url.rstrip(".,;:!?)\"'")).netloc.lower()
+        if d:
+            seen.add(d)
     if not seen:
-        print("citations: []")
-        return
+        print("citations: []"); return
     print("citations:")
-    for domain in sorted(seen):
-        print(f"  - {domain}")
+    for d in sorted(seen):
+        print(f"  - {d}")
+
+
+def cmd_log(args):
+    entry = {"ts": time.strftime("%Y-%m-%dT%H:%M:%S"),
+             "qid": args.qid, "intent": args.intent, "llm": args.llm,
+             "recipe": args.recipe, "panel_opened": args.panel_opened,
+             "urls_found": args.urls_found, "domains_unique": args.domains_unique}
+    if args.note:
+        entry["note"] = args.note
+    with open(args.path, "a", encoding="utf-8") as f:
+        f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+    print(f"[log] {entry['qid']} {entry['llm']} urls={entry['urls_found']} domains={entry['domains_unique']}", file=sys.stderr)
+
+
+def cmd_verify_log(args):
+    path = Path(args.path)
+    if not path.exists():
+        sys.exit(f"[verify-log] no log at {path}")
+    entries = [json.loads(l) for l in path.read_text(encoding="utf-8").splitlines() if l.strip()]
+    if not entries:
+        sys.exit(f"[verify-log] empty log at {path}")
+    by_llm = {}
+    for e in entries:
+        by_llm.setdefault(e["llm"], []).append(e)
+    print(f"[verify-log] {path.name} — {len(entries)} entries / {len(by_llm)} LLM(s)")
+    any_bad = False
+    for llm, es in by_llm.items():
+        mn = EXPECTED_MIN_DOMAINS.get(llm, 1)
+        ds = sorted(e["domains_unique"] for e in es)
+        op = sum(1 for e in es if e["panel_opened"])
+        bad = [e for e in es if e["domains_unique"] < mn]
+        print(f"\n  {llm} ({len(es)}q, expected_min={mn}): panel_opened={op}/{len(es)}, "
+              f"domains min={ds[0]} median={ds[len(ds)//2]} max={ds[-1]}")
+        if bad:
+            any_bad = True
+            print(f"    ⚠ ANOMALIES ({len(bad)}):")
+            for a in bad:
+                print(f"      [{a['qid']}] {a['intent']}: {a['domains_unique']} domains, panel_opened={a['panel_opened']}")
+        else:
+            print(f"    ✓ no anomalies")
+    sys.exit(2 if any_bad else 0)
+
+
+def _bool(s): return s.lower() in ("true", "1", "yes")
 
 
 def main():
     p = argparse.ArgumentParser(description="geo-probe helpers")
     sub = p.add_subparsers(dest="cmd", required=True)
 
-    pw = sub.add_parser("wait")
-    pw.add_argument("--min", type=float, default=20.0)
-    pw.add_argument("--max", type=float, default=60.0)
-    pw.set_defaults(func=cmd_wait)
+    pw = sub.add_parser("wait"); pw.add_argument("--min", type=float, default=20.0)
+    pw.add_argument("--max", type=float, default=60.0); pw.set_defaults(func=cmd_wait)
 
-    pi = sub.add_parser("init")
-    pi.add_argument("path")
-    pi.add_argument("--brand", required=True)
-    pi.add_argument("--llm", required=True)
+    pi = sub.add_parser("init"); pi.add_argument("path")
+    for n in ("brand", "llm", "probed-at", "probed-by"): pi.add_argument(f"--{n}", required=True)
     pi.add_argument("--total", type=int, required=True)
-    pi.add_argument("--probed-at", required=True)
-    pi.add_argument("--probed-by", required=True)
-    pi.add_argument("--overwrite", action="store_true")
-    pi.set_defaults(func=cmd_init)
+    pi.add_argument("--overwrite", action="store_true"); pi.set_defaults(func=cmd_init)
 
-    pa = sub.add_parser("append")
-    pa.add_argument("path")
-    pa.set_defaults(func=cmd_append)
+    pa = sub.add_parser("append"); pa.add_argument("path"); pa.set_defaults(func=cmd_append)
+    pe = sub.add_parser("extract-citations"); pe.set_defaults(func=cmd_extract_citations)
 
-    pe = sub.add_parser("extract-citations")
-    pe.set_defaults(func=cmd_extract_citations)
+    pl = sub.add_parser("log"); pl.add_argument("path")
+    for n in ("qid", "intent", "llm", "recipe"): pl.add_argument(f"--{n}", required=True)
+    pl.add_argument("--panel-opened", type=_bool, required=True)
+    pl.add_argument("--urls-found", type=int, required=True)
+    pl.add_argument("--domains-unique", type=int, required=True)
+    pl.add_argument("--note", default=None); pl.set_defaults(func=cmd_log)
+
+    pv = sub.add_parser("verify-log"); pv.add_argument("path"); pv.set_defaults(func=cmd_verify_log)
 
     args = p.parse_args()
     args.func(args)

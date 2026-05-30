@@ -179,7 +179,16 @@ custom_llms: []      # [{name, url, notes}, ...]
    - 目标品牌 + 常见简写/别名（你自己识别，比如"桥介数物"→"桥介"）
    - 别名的字面出现也计入 mentions
 
-6. **抽引用域名**:走第 6.5 节的 **per-LLM Recipe**(操作浏览器点开 sources 面板 + 执行对应 JS extractor → 下载 yaml → Bash 读 → 提取域名);**再**跑 `echo "<answer>" | python3 probe.py extract-citations` 作为兜底,两边合并去重
+6. **抽引用域名**(两步):
+   a. 走第 6.5 节的 **per-LLM Recipe**:操作浏览器点开 sources 面板 → 执行对应 JS extractor → 下载 yaml → Bash 读 → 提取域名
+   b. 兜底:`echo "<answer>" | python3 probe.py extract-citations` 抓正文里偶现的裸 URL,合并去重
+   c. **强制日志**(便于后续 verify-log 排查):
+      ```
+      python3 probe.py log <log-path> \
+        --qid q006 --intent 选型推荐 --llm DeepSeek --recipe deepseek \
+        --panel-opened true --urls-found 10 --domains-unique 7
+      ```
+      `log-path` 用 `probe-log-<llm-slug>-<date>.jsonl`,与 probe-results 同目录。**每条 query 必须 log 一次**——这是 verify-log 排查"recipe 没真跑"的唯一证据,绕过它 = 数据污染
 7. **品牌识别类（`intent: 品牌识别`）的特殊处理**：
    - LLM 完全没识别（说"不知道"）→ `target_brand` 全 null，notes 写"0 收录"
    - LLM 把品牌**串到另一家同名公司**了 → notes 写明"误识别"（**关键 GEO 信号**），`target_brand.mentions` 仍记字面次数但 sentiment 标 negative
@@ -409,6 +418,29 @@ results:
 
 ### 8. 跑完更新 probe-plan.yaml + 总结
 
+**第 0 件事(强制)**:跑 verify-log 检查这次 probe 的 citations 健康度:
+
+```
+python3 probe.py verify-log <log-path>
+```
+
+输出会按 LLM 给出 panel_opened 比例、domains/query 的 min/median/max、以及"低于 expected_min_domains"的异常清单。
+
+**对待异常的硬规则**:
+- **无异常(exit code 0)** → 数据可用,继续后面步骤
+- **有异常(exit code 2)** → **必须报给用户**:
+  > 这次 probe 有 K 条 query 的 citations 数低于预期(详见 verify-log 输出)。可能原因:
+  > - per-LLM recipe 没真的执行(只用了正文 URL 正则)
+  > - sources 面板没成功打开(button 点错位置 / 还没渲染)
+  > - 那条 query 模型本来就只引了少数源(正常)
+  >
+  > 选项:
+  > - a) 我重跑这 K 条(指定 qid 列表)
+  > - b) 接受异常,继续往下走(数据会偏低,analyze 会受影响)
+  > - c) 整个 LLM 这一轮重跑
+
+**不允许"看见 ⚠ 还往下走且不报"**——verify-log 就是为了堵这种情况设计的。
+
 **第一件事：更新 plan**。把刚跑完的 LLM 追加到 `completed`：
 
 ```yaml
@@ -456,6 +488,17 @@ python3 probe.py append <path>
 
 python3 probe.py extract-citations
   从 stdin 读文本，抽出 URL 并提取域名，输出去重排序的域名 YAML 列表。
+
+python3 probe.py log <jsonl-path> --qid <q006> --intent <intent> --llm <name> \
+                  --recipe <qwen|deepseek|kimi|doubao|fallback> \
+                  --panel-opened <true|false> --urls-found <N> --domains-unique <N> \
+                  [--note <text>]
+  追加一条 JSONL 抽取日志。每条 query 抽完 citations 后必须 log 一次。
+
+python3 probe.py verify-log <jsonl-path>
+  读日志,按 LLM 输出健康度报告;若有 query 的域名数低于
+  EXPECTED_MIN_DOMAINS 阈值,exit code 2 + 标记 ⚠ ANOMALIES。
+  跑完 probe 后必须执行(见第 8 步第 0 件事)。
 ```
 
 ---
@@ -548,3 +591,5 @@ results:
 - 不要把描述性提及计入 mentions（mentions 只算字面出现，描述性提及进 notes）
 - **不要绕开 `probe.py wait`**——不要把 `--min --max` 都改成 0 或 < 5
 - **不要自己手写 YAML 追加**——必须走 `probe.py append`（防止格式坏掉）
+- **不要跳过 `probe.py log`**——每条 query 抽完 citations **必须** log 一次。少 log 一条,verify-log 就抓不到"recipe 没真跑"的证据
+- **不要在 verify-log 报 ⚠ ANOMALIES 时静默继续**——必须按第 8 步硬规则报给用户,让用户决定 a/b/c
