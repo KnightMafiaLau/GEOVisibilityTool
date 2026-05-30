@@ -210,13 +210,20 @@ else:
 
 ### 6. 算引用源域名 top（这是 geo-channels 的关键输入）
 
-跨所有 query 所有 LLM，统计 `citations` 列表里每个域名：
+**⚠️ 重要 schema 变更**(2026-05-30):`citations` 字段现在存的是 **URL 列表**(不去重),不再是域名列表。同一域名多个 URL 全保留——频次本身是"该渠道权重"的信号。
 
-- `appearances`：总出现次数
-- `appearing_in_intents`：在哪些 intent 类型里出现过（去重）
-- `appearing_in_llms`：在哪些 LLM 上被引用过（去重）
+提取域名要在 analyze 阶段**现算**:对每条 URL `urlparse(url).netloc.lower()`,得到 hostname。
 
-按 `appearances` 降序排，取 **top 15**。
+跨所有 query 所有 LLM,统计每个**域名**(从 URL hostname 派生):
+
+- `appearances`:URL 出现的总次数(**同域名多个 URL 都计数;同 URL 多次出现也计数**——这就是"该渠道值得多投放"的根据)
+- `unique_urls`:该域名下出现过多少个**不同** URL(衡量"覆盖广度":1 个 URL 引 10 次 vs 10 个 URL 各引 1 次,后者更强)
+- `appearing_in_intents`:在哪些 intent 类型里出现过(去重)
+- `appearing_in_llms`:在哪些 LLM 上被引用过(去重)
+
+按 `appearances` 降序排,取 **top 15**。**报告这张表时同时显示 `unique_urls`**,这是区分"一篇热文反复被引"和"该站多篇内容都被引"的关键。
+
+**向后兼容**:如果遇到旧 schema 的 probe-results(`citations` 直接是域名列表,不是 URL),把每个域名当一个 URL 处理(`urlparse('domain.com').netloc` 返回空,所以这种情况下直接拿字符串当 hostname)。在 analysis.md frontmatter 里标 `legacy_citations_schema: true` 警示下游。
 
 ### 6.5 算 per LLM × per intent 引用源偏好矩阵(geo-report 节 6.2 的输入)
 
@@ -224,8 +231,8 @@ else:
 
 对每个 LLM × 每个 intent 类型(6 类),统计:
 
-- 该 (LLM, intent) 组合下出现过的所有域名
-- 每个域名在该组合下的出现次数
+- 该 (LLM, intent) 组合下出现过的所有域名(从 URL 现算 `urlparse(url).netloc`)
+- 每个域名在该组合下的**出现次数**(URL 级,不去重)
 - 取 top 5(不足 5 个就有几个列几个;少于 3 个的标记"数据稀疏")
 
 输出形式(在 analysis.md 里用嵌套小节呈现,见输出格式)。

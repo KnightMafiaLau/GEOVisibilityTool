@@ -8,12 +8,13 @@ from urllib.parse import urlparse
 
 URL_RE = re.compile(r"https?://[^\s<>\"\)\]]+")
 
-# 每个 LLM citations 时,每条 query 至少应有多少唯一域名(低于此数 = 异常)
-EXPECTED_MIN_DOMAINS = {
-    "Qwen": 5, "qwen": 5, "千问": 5,
-    "DeepSeek": 3, "deepseek": 3,
-    "Kimi": 2, "kimi": 2,
-    "豆包": 0, "Doubao": 0, "doubao": 0,  # 0 = 默认无联网,不报警
+# 每个 LLM citations 时,每条 query 至少应有多少条 URL(低于此数 = recipe 没真跑或 panel 没开)
+# 这是 citations 列表的"条数"阈值;citations 现在存 URL(不去重),所以阈值参照 panel 典型 N
+EXPECTED_MIN_CITATIONS = {
+    "Qwen": 5, "qwen": 5, "千问": 5,         # panel 典型 60-90
+    "DeepSeek": 3, "deepseek": 3,           # panel 典型 10
+    "Kimi": 2, "kimi": 2,                    # panel 典型 9(部分非 link)
+    "豆包": 0, "Doubao": 0, "doubao": 0,    # 0 = 默认无联网,不报警
 }
 
 
@@ -50,16 +51,15 @@ def cmd_append(args):
 
 
 def cmd_extract_citations(args):
-    seen = set()
-    for url in URL_RE.findall(sys.stdin.read()):
-        d = urlparse(url.rstrip(".,;:!?)\"'")).netloc.lower()
-        if d:
-            seen.add(d)
-    if not seen:
+    # 输出 URL 列表(不去重 — 同一 URL 出现多次 = 信号:模型多次引用)
+    # 同一域名多个 URL 也保留(下游 analyze 用 urlparse(u).netloc 现算频次)
+    urls = [u.rstrip(".,;:!?)\"'") for u in URL_RE.findall(sys.stdin.read())]
+    urls = [u for u in urls if u]
+    if not urls:
         print("citations: []"); return
     print("citations:")
-    for d in sorted(seen):
-        print(f"  - {d}")
+    for u in urls:
+        print(f"  - {u}")
 
 
 def cmd_log(args):
@@ -87,7 +87,7 @@ def cmd_verify_log(args):
     print(f"[verify-log] {path.name} — {len(entries)} entries / {len(by_llm)} LLM(s)")
     any_bad = False
     for llm, es in by_llm.items():
-        mn = EXPECTED_MIN_DOMAINS.get(llm, 1)
+        mn = EXPECTED_MIN_CITATIONS.get(llm, 1)
         ds = sorted(e["domains_unique"] for e in es)
         op = sum(1 for e in es if e["panel_opened"])
         bad = [e for e in es if e["domains_unique"] < mn]

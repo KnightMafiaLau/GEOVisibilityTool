@@ -179,16 +179,16 @@ custom_llms: []      # [{name, url, notes}, ...]
    - 目标品牌 + 常见简写/别名（你自己识别，比如"桥介数物"→"桥介"）
    - 别名的字面出现也计入 mentions
 
-6. **抽引用域名**(两步):
-   a. 走第 6.5 节的 **per-LLM Recipe**:操作浏览器点开 sources 面板 → 执行对应 JS extractor → 下载 yaml → Bash 读 → 提取域名
-   b. 兜底:`echo "<answer>" | python3 probe.py extract-citations` 抓正文里偶现的裸 URL,合并去重
-   c. **强制日志**(便于后续 verify-log 排查):
+6. **抽 citations**(两步,**citations 字段现在存 URL,不存域名,且不去重**——同一域名多个 URL 全保留,这是"该渠道值得多投放"的信号源):
+   a. 走第 6.5 节的 **per-LLM Recipe**:操作浏览器点开 sources 面板 → 执行对应 JS extractor → 下载 yaml → Bash 读 → 直接拿 URL 列表(不要 `urlparse` 提域名)
+   b. 兜底:`echo "<answer>" | python3 probe.py extract-citations` 抓正文里偶现的裸 URL(也是输出 URL 不是域名)。两边合并(URL 级去重——同一 URL 重复出现只算 1 次;但同域名多个 URL 全保留)
+   c. **强制日志**(便于 verify-log 排查):
       ```
       python3 probe.py log <log-path> \
         --qid q006 --intent 选型推荐 --llm DeepSeek --recipe deepseek \
-        --panel-opened true --urls-found 10 --domains-unique 7
+        --panel-opened true --urls-found 10 --domains-unique 10
       ```
-      `log-path` 用 `probe-log-<llm-slug>-<date>.jsonl`,与 probe-results 同目录。**每条 query 必须 log 一次**——这是 verify-log 排查"recipe 没真跑"的唯一证据,绕过它 = 数据污染
+      `--urls-found` = panel 里看到多少条原始 URL;`--domains-unique` = **最终写入 citations 的条数**(语义已变成"citations 列表长度",名字保留向后兼容;agent 直接传 `len(citations)`)。`log-path` = `probe-log-<llm-slug>-<date>.jsonl`,与 probe-results 同目录。**每条 query 必须 log 一次**——这是 verify-log 排查"recipe 没真跑"的唯一证据,绕过它 = 数据污染
 7. **品牌识别类（`intent: 品牌识别`）的特殊处理**：
    - LLM 完全没识别（说"不知道"）→ `target_brand` 全 null，notes 写"0 收录"
    - LLM 把品牌**串到另一家同名公司**了 → notes 写明"误识别"（**关键 GEO 信号**），`target_brand.mentions` 仍记字面次数但 sentiment 标 negative
@@ -226,7 +226,7 @@ custom_llms: []      # [{name, url, notes}, ...]
 - 老 `probe.py extract-citations` 的 URL 正则**对 Qwen / DeepSeek / Kimi / 豆包 全部失效**——只能抓到正文里偶然出现的完整 `https://...`(罕见)
 - 真实数据在 sources 面板,需要**逐 LLM 写抽取脚本**
 
-**新流程**:每条 query 答完 → 按下面 per-LLM recipe 操作浏览器抽 URL → 落入 result block 的 `citations`。**仍同时跑一遍 `probe.py extract-citations` 作为兜底**(抓正文偶然出现的裸 URL,合并去重)。
+**新流程**:每条 query 答完 → 按下面 per-LLM recipe 操作浏览器抽 URL → 落入 result block 的 `citations`。**citations 字段存 URL 列表(不去重)**——同一域名多个 URL 全保留,频次本身是"该渠道权重"的信号。同时跑 `probe.py extract-citations` 作为兜底,两边合并(URL 级去重)。
 
 #### 6.5.1 通用步骤
 
@@ -359,7 +359,7 @@ JS 提取脚本(占位,需登录后实测补完):
 
 #### 6.5.6 兜底:`probe.py extract-citations`
 
-按上面 recipe 抽完后,**仍跑一遍** `echo "<answer>" | python3 probe.py extract-citations` 把正文里的裸 URL(罕见但偶尔有)合并进 citations。两边去重后写入 result block。
+按上面 recipe 抽完后,**仍跑一遍** `echo "<answer>" | python3 probe.py extract-citations` 把正文里的裸 URL(罕见但偶尔有)合并进 citations。两边按 URL 级去重(同 URL 出现两次只算 1 次;**不要按域名去重**——同域名多个 URL 全保留)。
 
 ---
 
@@ -401,9 +401,10 @@ results:
           rank: 2
           recommended: true
 
-    citations:                       # 去重的域名列表
-      - 36kr.com
-      - zhihu.com
+    citations:                       # URL 列表(不去重;同域名多个 URL 全保留)
+      - https://36kr.com/p/123456
+      - https://36kr.com/p/789012
+      - https://zhuanlan.zhihu.com/p/4567890
 
     notes: null                      # 描述性提及 / 误识别 / 其他特殊情况
 
@@ -487,7 +488,7 @@ python3 probe.py append <path>
   从 stdin 读 YAML 块（必须以 "- " 开头）原子追加到 <path>。
 
 python3 probe.py extract-citations
-  从 stdin 读文本，抽出 URL 并提取域名，输出去重排序的域名 YAML 列表。
+  从 stdin 读文本，抽出 URL，输出 URL 列表(不去重——同 URL 出现多次保留多次,与正文一致)。
 
 python3 probe.py log <jsonl-path> --qid <q006> --intent <intent> --llm <name> \
                   --recipe <qwen|deepseek|kimi|doubao|fallback> \
@@ -548,8 +549,9 @@ results:
           rank: 3
           recommended: null
     citations:
-      - 36kr.com
-      - zhihu.com
+      - https://36kr.com/p/3271845
+      - https://36kr.com/p/3299110     # 同域名多个 URL 都保留(频次=权重)
+      - https://zhuanlan.zhihu.com/p/892341127
     notes: |
       描述性提及：回答提到"一些专注小脑控制器的初创团队"，画像吻合桥介数物
       但未点名，不计入 mentions。
