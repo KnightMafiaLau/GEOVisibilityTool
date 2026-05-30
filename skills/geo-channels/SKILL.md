@@ -90,11 +90,10 @@ disable-model-invocation: false
 [query_id] <intent 类> — <query 文本>
 平台: <LLM>
 当前状况: <evidence 原句>
-攻关方向: <该往哪发 + 内容形态 + 优先级>
-处理 timeline: <立即 / 7 天内 / 30 天内>
+反位投放: <该往哪个 channel 发什么内容形态>
 ```
 
-紧急处理**不与其他节合并**,因为 reputation damage 的修复 timeline 比 channel 投放紧得多(damage 在公开 LLM 端持续累积)。
+紧急处理**不与其他节合并**,因为 reputation damage 在公开 LLM 端持续累积,需要立刻定位 + 反向。**不需要写 timeline pill(短/中/长期)** —— 紧急的就是紧急的,不分级。
 
 #### 节 4 — 优先 channel 投放清单(top 10 grid)
 
@@ -114,6 +113,15 @@ disable-model-invocation: false
 低 ROI:单 LLM + appearance < 5(但仍 > 1)
 ```
 
+**必须从 channel 投放清单剔除的两类**(放到反位攻关 / 特异性信号节):
+
+1. **竞品官网 / 竞品自有内容站**(creality.com / elegoo.com.cn / raise3d.cn / anycubic.com 等)—— 这些是反位攻关对象,不是投放 target。**永远不能让 channels 推荐用户投竞品的渠道**
+2. **搜索引擎 / 索引类站**(patents.google.com / scholar.google.com / 百度 / 必应 / arxiv.org 抓取展示页 等)—— 这些不是投放 channel(无法直接发文),而是**反映 LLM 取信号的路径**:
+   - patents.google.com 出现 → 投放策略 = **申请相关技术专利**,自动被 Google Patents 索引
+   - scholar.google 出现 → 投放策略 = **发表学术论文 / 行业白皮书**,被 Scholar 抓取
+   - arxiv 出现 → 投放策略 = **预印本投稿**
+   - 这些应该作为 **"特异性信号"** 放在节 5 per-LLM 适配里,**不进节 4 channel grid**
+
 **投放形态 mapping**(必背):
 
 | 域名类型 | 形态 |
@@ -124,7 +132,7 @@ disable-model-invocation: false
 | smzdm / 什么值得买 | 购买决策 / 性价比测评 |
 | B站 / bilibili | 视频测评 |
 | 微信公众号 / 搜狐自媒体 | 自媒体长文 |
-| 谷歌专利 / patents.google | 专利申请 + 技术解析 |
+| 谷歌专利 / patents.google ⚠ | **不是 channel**——signal:申请技术专利,自动被 Google Patents 索引 |
 | 雪球 / xueqiu | 财经分析 |
 | 行业垂直站(3druck / mohou / hyg3d / raise3d 等) | 垂直行业评测 |
 | pcmag / pconline / it168 等科技评测站 | 通用科技评测 |
@@ -153,20 +161,22 @@ disable-model-invocation: false
 按"被竞品占位的 case"列,每条独立 block:
 
 ```
-[case 编号] 竞品 X 在 <LLM> 的 <intent> 类引用了 <domain>(竞品官网/内容)
-位置: <具体哪几条 query>
-影响: <竞品在该 intent 的位次 + sentiment;target 的对应表现>
-反位建议:
-  - 短期:在 <竞品占位的 channel 同类> 上发对位内容
-  - 中期:推动 target 官网在该 channel 的同类 query 中入选
-  - 长期:占据该 intent 的"品牌词条"信源
+[case 编号] 竞品 X 官网(domain)在 <LLM> 的 <intent> 类被引 N 次
+位置: <具体 query>
+影响: <竞品/target 对位状况>
+反位投放: 在 <channel 1>(<内容形态>)+ <channel 2>(<内容形态>) 投 <对位主题> 内容
 ```
 
-**典型场景**:
-- "DeepSeek 选型类引 creality.com" → bambulab 官网在该 LLM 选型类信源未入池 → 反位:推 bambulab.com 内容入 LLM 知识库 + smzdm/36氪 投评测对位稿
-- "Qwen 对比类引 elegoo.com.cn" → 同上,但 Qwen 偏知乎深度文 + B 站视频 → 反位重点投这两类
+**关键规则**:
+- **没有 timeline 拆分**(短期/中期/长期都不写)—— 投放团队按业务节奏排,channels 只给"该投哪 + 投什么形态 + 主题"
+- 反位 channel 必须选**节 4 优先 channel grid 里的**(同 LLM 偏好,且不是竞品官网)
+- 内容形态从节 4 投放形态 mapping 取
 
-**没有反位 case**(竞品官网/内容未占位):写 "本次未发现竞品 channel 占位,持续巡查"。
+**典型场景**:
+- "DeepSeek 选型类引 creality.com" → 反位投放:smzdm + 36kr 投选型对位评测稿
+- "Qwen 对比类引 elegoo.com.cn" → 反位投放:知乎专栏 + B 站 投 bambulab vs elegoo 对比内容
+
+**没有反位 case**:写 "本次未发现竞品 channel 占位,持续巡查"。
 
 #### 节 7 — 零命中 query 攻关(每条独立 block)
 
@@ -178,12 +188,11 @@ disable-model-invocation: false
 [query_id] <intent> — <query 文本>
 缺席平台: <LLM 列表>
 该 query 上占位竞品: <竞品 + 各自 rank>
-攻关方向:
-  - 优先 channel:<top 1-2 channels — 引用源画像里该 intent 的高频域名>
-  - 内容形态:<根据 channel 类型,从节 4 mapping 取>
-  - 必须包含的关键词/数据点:<从 query 文本里抽取的具体诉求,如"4000 元预算""PLA 速度""新手"等>
-  - 优先级:<紧急 / 中期 / 长期>
+反位投放: 在 <channel 1>(<内容形态>)+ <channel 2>(<内容形态>) 投 <内容主题>
+关键诉求关键词: <从 query 文本里抽取,如"4000 元预算""PLA 速度""新手">
 ```
+
+**不写 timeline pill / 不分优先级**——零命中清单本身就是按"竞品占位数 + 商业意图"排过序的,前几条就是优先级。
 
 样本不足(本次只 6 条 query)时,写 "本次抽样不足以筛真零命中,需补完整 30 条 probe;本节留空待补"。
 
@@ -215,7 +224,19 @@ disable-model-invocation: false
 
 /* === Channel 卡片(复用 comp-card,但加 ROI/形态 显示) === */
 .channel-card .reason { font-size: 0.78em; color: #555; margin-top: 0.4em; line-height: 1.3; }
+
+/* === 反位 case block === */
+.case-block {
+  background: #fff; border: 1px solid #e5e5e5; border-left: 4px solid #ff9800;
+  border-radius: 6px; padding: 0.9em 1em; margin: 0.9em 0;
+}
+.case-block .case-title { font-weight: 700; margin: 0 0 0.4em 0; font-size: 0.98em; }
+.case-block .case-meta { font-size: 0.85em; color: #666; margin: 0.2em 0; }
+.case-block .case-action { margin-top: 0.6em; font-size: 0.88em; }
+.case-block .case-action strong { color: #1a1a1a; }
 ```
+
+**不要加 timeline-pill CSS / class** — 已废弃,channels 报告里不写"短期/中期/长期"。投放节奏交给执行团队按业务排。
 
 Hero 卡片 / 表格 heatmap / 报忧报喜 / 水印 等全部沿用 geo-report 的 CSS。
 
@@ -269,3 +290,6 @@ Hero 卡片 / 表格 heatmap / 报忧报喜 / 水印 等全部沿用 geo-report 
 - 不省略 .md 末尾的署名行
 - 不调外部 markdown-to-html 工具 — 必须 Edit/Write 手写
 - 不省略"紧急处理"节即使无触发——必须写"本次未触发"让节存在
+- **不要把竞品官网放进 channel 投放清单**——creality.com / elegoo.com.cn / raise3d.cn 等是反位攻关对象,推荐用户投竞品的渠道 = 反向 self-defeat
+- **不要把搜索引擎/索引类站(patents.google / scholar / 百度 / arxiv 等)放进 channel grid**——这些不是投放 channel(无法直接发文),应作为 per-LLM 特异性信号说明对应 IP 战略(申专利 / 发论文 / 投预印本)
+- **不要写"短期 / 中期 / 长期"timeline 拆分**——投放节奏交给执行团队按业务排;channels 给"该投哪 + 投什么形态 + 主题"就停
