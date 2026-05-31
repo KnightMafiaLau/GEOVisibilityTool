@@ -294,7 +294,31 @@ my-brand/
 
 ---
 
-## 七、本地知识库(自动累积 + 跨 brand 学习)
+## 七、可选硬约束:hooks(防 agent 自作主张)
+
+**问题**:Skills 是软约束。Claude 可能跑完 `geo-analyze` 后用 `Write` 直接造 report/channels(绕过 dedicated skill)→ 产物缺水印 / 缺 Topify 结构 / 不合规。
+
+**解决**:用 Claude Code 的 **hooks** 机制做硬约束。安装后,Claude 试图 Write 任何 `report-*-*.html/md` 或 `channels-*-*.html/md` 时,hook 拦截 → 检查 content 是否含必需 marker(水印 / hero-card / heatmap / urgent-block 等)→ 缺一就 `block` + 提示用 Skill tool。
+
+**安装**:
+
+```bash
+cd <repo>
+hooks/install.sh   # 需要 jq;自动备份 ~/.claude/settings.json
+# 重启 Claude Code
+```
+
+详见 [`hooks/README.md`](hooks/README.md)。
+
+**为什么这是真硬约束**:hooks 是用户机器上的 shell 进程,Claude 无法 bypass。content-based 检查 → Skill 产出会含 marker(approve)/ Claude 自造会缺 marker(block),无状态、无 lockfile,纯函数。
+
+> SKILL.md 是教 Claude **该怎么做**(soft)
+> hooks 是不让 Claude **做错的事**(hard)
+> 两者一起用,才是 production-grade harness
+
+---
+
+## 八、本地知识库(自动累积 + 跨 brand 学习)
 
 每次 harness 跑完都会**自动 ingest 到本地 KB**(`~/.geo-kb/kb.sqlite`),累积形成"跨 brand、跨 vertical、跨时间"的可查询知识库。
 
@@ -343,7 +367,7 @@ python3 scripts/kb.py stats
 
 ---
 
-## 八、参与改进 — 让工具持续变好
+## 九、参与改进 — 让工具持续变好
 
 > **本项目绝不自动收集任何遥测数据**。改进完全靠社区主动反馈,详见 [CONTRIBUTING.md](CONTRIBUTING.md)。
 
@@ -385,7 +409,7 @@ python3 scripts/make-bundle.py <你的测试目录> --vertical "<行业类别>"
 
 ---
 
-## 九、License 与 Attribution
+## 十、License 与 Attribution
 
 本项目采用 **Apache License 2.0**(完整文本见 [LICENSE](LICENSE)),附 [NOTICE](NOTICE) 文件说明 attribution 义务。
 
