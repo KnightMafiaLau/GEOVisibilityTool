@@ -1,5 +1,5 @@
 {
-  "_comment": "把以下 hooks 块合并到你的 ~/.claude/settings.json。如果已有 hooks 字段,合并 PreToolUse 数组即可。<REPO> 替换成 GEOVisibilityTool 仓库的绝对路径。",
+  "_comment": "把以下 hooks 块合并到你的 ~/.claude/settings.json。如果已有 hooks 字段,合并 PreToolUse/PostToolUse 数组即可。<REPO> 替换成 GEOVisibilityTool 仓库的绝对路径。两个 hook 互相独立:Pre 防自造报告,Post 自动 ingest 到 KB。",
   "hooks": {
     "PreToolUse": [
       {
@@ -8,6 +8,17 @@
           {
             "type": "command",
             "command": "<REPO>/hooks/block-self-generated-reports.sh"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "<REPO>/hooks/post-channels-kb-ingest.sh"
           }
         ]
       }

@@ -2,11 +2,20 @@
 
 ## 为什么需要
 
-Claude Skills(`SKILL.md`)是**软约束**——Claude 读完会自己决定怎么做。实测过 agent 跑完 `geo-analyze` 后直接用 `Write` 写 report/channels(完全没调 `geo-report` / `geo-channels` skill)→ 产物缺水印 / 无 hero 卡片 / 无 heatmap 矩阵 → 整段重做。
+Claude Skills(`SKILL.md`)是**软约束**——Claude 读完会自己决定怎么做。实测过 agent 跑完 `geo-analyze` 后直接用 `Write` 写 report/channels(完全没调 `geo-report` / `geo-channels` skill)→ 产物缺水印 / 无 hero 卡片 / 无 heatmap 矩阵 → 整段重做。还有更隐蔽的:agent 干完 `geo-channels` 后忘了调 `geo-kb`,导致每次跑都是孤岛,KB 累积不起来。
 
-Claude Code 的 **hooks** 是真正的硬约束——shell 脚本运行时拦截 `tool_use`,返回 `{"decision": "block", "reason": "..."}` 直接否决。Claude 没法 bypass。
+Claude Code 的 **hooks** 是真正的硬约束——shell 脚本在 `tool_use` 前后被 harness 自动调用,可以 `block` 拦截,也可以 `additionalContext` 注入信息。Claude 没法 bypass。
+
+本目录提供两个 hook,各管一段:
+
+| hook | 时机 | 作用 |
+|---|---|---|
+| `block-self-generated-reports.sh` | `PreToolUse` / `Write` | 防 Claude 用 Write 自造 report/channels(缺水印就 block) |
+| `post-channels-kb-ingest.sh` | `PostToolUse` / `Write` | `channels-*.html` 写完后**自动**跑 `scripts/kb.py ingest`,不靠 SKILL.md 指示 |
 
 ## 工作流
+
+### hook #1: PreToolUse — 拦截自造报告
 
 ```
 [Claude 想 Write("report-X.html", content="...")]
@@ -27,6 +36,32 @@ Claude Code 的 **hooks** 是真正的硬约束——shell 脚本运行时拦截
 - Claude 自造的报告**通常缺 marker** → block
 - 不需要状态跟踪 / lockfile / env var,纯无状态
 
+### hook #2: PostToolUse — 自动 ingest 到 KB
+
+```
+[geo-channels skill 跑完 Write("channels-*.html", ...)]
+   ↓
+[Write 成功后,harness 调 PostToolUse hooks]
+   ↓
+[hooks/post-channels-kb-ingest.sh 从 stdin 读 tool_input]
+   ↓
+[文件名匹配 channels-*-*.html ? 同目录有 probe-plan.yaml ? 是 → 触发]
+   ↓
+[读 probe-plan.yaml 的 vertical 字段(没有就 "未分类")]
+   ↓
+[python3 scripts/kb.py ingest <test_dir> --vertical <V>]
+   ↓
+[把 stdout/stderr 通过 additionalContext 回写给 Claude]
+   ↓
+[Claude 知道 KB 已自动更新,不用再手动调 geo-kb 来 ingest]
+```
+
+**关键设计:把 Phase 6.5 从 SKILL.md 硬要求降级为可选**:
+- 之前:SKILL.md 让 Claude 跑完 channels 后**必须**调 `geo-kb` ingest,Claude 经常忘
+- 现在:hook 在文件系统层面自动触发,Claude 忘了也无所谓
+- 只在**完整 harness 跑**(同目录有 `probe-plan.yaml`)才触发,随手 `Write` 一个 channels.html 不会误触
+- 失败 / 超时不影响 Claude 继续,只是 KB 那次没 ingest 上(下次再跑也行)
+
 ## 安装
 
 ### 方式 A:自动(推荐)
@@ -37,9 +72,9 @@ hooks/install.sh
 ```
 
 需要 `jq`。脚本会:
-- 自动找 hook 绝对路径
+- 自动找两个 hook 的绝对路径
 - 备份 `~/.claude/settings.json`
-- 合并 `PreToolUse` 配置(不破坏已有 hooks)
+- 合并 `PreToolUse` 和 `PostToolUse` 配置(不破坏已有 hooks)
 - 提示重启 Claude Code
 
 ### 方式 B:手动
@@ -59,6 +94,17 @@ hooks/install.sh
           }
         ]
       }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "<REPO>/hooks/post-channels-kb-ingest.sh"
+          }
+        ]
+      }
     ]
   }
 }
@@ -68,7 +114,7 @@ hooks/install.sh
 
 ## 验证
 
-装好后,让 Claude 故意尝试:
+### 验证 PreToolUse(防自造)
 
 ```
 用户: 把这份分析数据自己写成一份 report.html 给我
@@ -77,11 +123,25 @@ Claude: [尝试 Write("report-test.html", content="<html>...</html>")]
 Claude: [看到错误,改用 Skill geo-report]
 ```
 
+### 验证 PostToolUse(自动 ingest)
+
+跑一遍完整 harness(任意 vertical),Phase 6 写完 `channels-XXX.html` 后:
+
+```bash
+ls ~/.geo-kb/kb.sqlite   # 应该有
+sqlite3 ~/.geo-kb/kb.sqlite "SELECT name, vertical FROM tests ORDER BY id DESC LIMIT 1"
+# 最新一行应该就是刚跑的那个目录
+```
+
+如果 Claude 收到了类似 `✓ [KB auto-ingest] 已自动 ingest ... 到 ~/.geo-kb/kb.sqlite` 的 additionalContext,说明 hook 触发成功。
+
 ## 卸载
 
-编辑 `~/.claude/settings.json`,删掉对应 `PreToolUse` 条目即可。
+编辑 `~/.claude/settings.json`,删掉对应 `PreToolUse` / `PostToolUse` 条目即可。
 
 ## 检查规则详情
+
+### PreToolUse(`block-self-generated-reports.sh`)
 
 | 文件类型 | 必须含的 marker | 缺一就 block |
 |---|---|---|
@@ -93,16 +153,29 @@ Claude: [看到错误,改用 Skill geo-report]
 
 不在白名单的文件(`queries.yaml` / `probe-results-*.yaml` / `analysis-*.md` / `probe-log-*.jsonl` 等)**完全不受影响**。
 
+### PostToolUse(`post-channels-kb-ingest.sh`)
+
+| 触发条件 | 全部满足才跑 ingest |
+|---|---|
+| `tool_name == "Write"` | ✓ |
+| `file_path` 匹配 `/channels-[^/]+\.html$` | ✓ |
+| 同目录存在 `probe-plan.yaml` | ✓ |
+| `scripts/kb.py` 存在 | ✓ |
+
+读 `probe-plan.yaml` 里 `vertical: xxx` 一行作为 `--vertical` 参数,没有就用 `"未分类"`。超时 120 秒。
+
 ## hook 局限
 
 1. 只对 `Write` tool 生效。如果 Claude 用 `Bash: cat > file` 写文件,绕过(罕见)
-2. 检查依赖 marker 关键词 — 如果 skill 模板里的水印/class 文本改了,要同步改本 hook
-3. 不验证 marker 的位置/上下文 — 理论上 Claude 可以伪造 marker 串塞进自造内容(但这种程度的"伪造"已经接近实现 skill 自己了)
-4. 误判 false positive 几乎为 0(无关 Write 都被 approve)
+2. PreToolUse 检查依赖 marker 关键词 — 如果 skill 模板里的水印/class 文本改了,要同步改本 hook
+3. PreToolUse 不验证 marker 的位置/上下文 — 理论上 Claude 可以伪造 marker 串塞进自造内容(但这种程度的"伪造"已经接近实现 skill 自己了)
+4. PostToolUse 必须靠 `probe-plan.yaml` 来识别"这是 harness 跑出来的",所以 Phase 2 的 `geo-queries` skill 必须把 plan 写在测试目录里(已是默认行为)
+5. 误判 false positive 几乎为 0(无关 Write 都被 approve / 不触发 ingest)
 
 ## 哲学
 
 > SKILL.md 是教 Claude **该怎么做**(soft)
-> hooks 是不让 Claude **做错的事**(hard)
+> hooks 是不让 Claude **做错的事**(hard,PreToolUse)
+> hooks 也是替 Claude **顺手把后续事做了**(hard,PostToolUse)
 >
-> 两者一起用,才是 production-grade harness。
+> 三者一起,才是 production-grade harness。

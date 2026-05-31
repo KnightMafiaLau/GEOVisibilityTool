@@ -92,10 +92,16 @@ geo-probe 第 1.2 节自带"首次跑→问 planned_llms→建 plan"逻辑。但
 
 写 probe-plan.yaml 到测试目录,格式见 TASKS.md。
 
+**必带字段:`vertical: <品牌所在垂类>`**(harness 模式下问用户一次,后续 Phase 6.5 / KB hook 都会读这个字段):
+- 例:`vertical: "3D 打印"`、`vertical: "AI 搜索"`、`vertical: "在线职业培训"`
+- 用户给不出 → 写 `vertical: "未分类"`
+- 这个字段被 PostToolUse hook `post-channels-kb-ingest.sh` 读来打标签,**没这个字段 KB 自动 ingest 仍会跑,但全归到"未分类"**
+
 **Checkpoint 2:** 跟用户确认:
 
 > 准备开跑:
 > - 品牌:**<X>**
+> - 垂类:**<V>**
 > - 测试目录:**<path>**
 > - 计划 LLM:**<list>**(N 个)
 > - 估计耗时:**N × 20-30 分钟 = <total> 分钟**
@@ -229,26 +235,30 @@ grep -c "🔥 紧急处理" <path>/channels-*.html  # 必须 = 1
 > - `<path>/channels-<brand>-<date>.html`(已在浏览器打开)
 > - ✓ 自检通过(水印 / urgent-block / pill CSS / 紧急处理节齐全)
 
-### 9.5. Phase 6.5 — 自动 ingest 到本地 KB
+### 9.5. Phase 6.5 — ingest 到本地 KB(默认由 hook 自动做)
 
-🚫 **硬约束**:**绝不能**自己 SQL 写库 / Write 编辑 KB 文件 / 跳过这一步。**只能**调 `scripts/kb.py ingest`,让那个 Python 脚本处理 SQLite。绕过 = KB 数据结构污染 + 后续 query 失败。
+🚫 **硬约束**:**绝不能**自己 SQL 写库 / Write 编辑 KB 文件。**只能**调 `scripts/kb.py ingest`,让那个 Python 脚本处理 SQLite。绕过 = KB 数据结构污染 + 后续 query 失败。
 
-跑完整端到端后,**自动**把这次产物 ingest 到本地 ~/.geo-kb/kb.sqlite,累积跨 brand 经验。
+**默认路径(零操作)**:仓库根的 `hooks/post-channels-kb-ingest.sh` 注册成 PostToolUse hook 后,Phase 6 写完 `channels-*.html` 会**自动**触发 ingest:
+
+- hook 看到 Write 的是 `channels-*-*.html` 且同目录有 `probe-plan.yaml`
+- 从 `probe-plan.yaml` 读 `vertical:` 字段(没填就 `未分类`,所以 **Phase 2 必须把 vertical 写进 plan**)
+- 跑 `python3 <repo>/scripts/kb.py ingest <test_dir> --vertical <V>`
+- 通过 additionalContext 回写结果给 Claude(类似 `✓ [KB auto-ingest] 已自动 ingest ... 到 ~/.geo-kb/kb.sqlite`)
+
+**收到 hook 的回写就当 Phase 6.5 完成**,直接进 Phase 7,不要再手动调 `geo-kb`。
+
+**fallback(用户没装 hook 时)**:如果跑完 channels 没看到 `[KB auto-ingest]` 这段回写,说明 hook 没注册 → 手动跑一次:
 
 ```bash
 # 第一次跑 KB 之前(如果 ~/.geo-kb/ 不存在)
 python3 <repo>/scripts/kb.py init
 
-# 每次跑完都自动 ingest
-python3 <repo>/scripts/kb.py ingest <测试目录> --vertical "<品牌所在垂类>"
+# 手动 ingest(参数从 probe-plan.yaml 里读)
+python3 <repo>/scripts/kb.py ingest <测试目录> --vertical "<plan.vertical>"
 ```
 
-**垂类(vertical)输入**:
-- 如果 plan.yaml 或品牌信息里有"垂类"字段,直接用
-- 没有就**问用户一次**:"这个品牌属于什么垂类?如 3D 打印 / SaaS / 机器人 / 消费电子 等。这个标签让后续跨 brand 查询能聚合到同垂类"
-- 用户拒绝填,标 `vertical=未分类`(后续 query 时该 brand 不会出现在 vertical-filtered 结果里)
-
-完成后简短报告:
+完成后(不论是 hook 做的还是手动做的)简短报告:
 
 > KB 已更新:run_id=<N> · 累积 <X> runs / <Y> brands / <Z> verticals
 >
