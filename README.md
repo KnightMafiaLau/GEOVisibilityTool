@@ -294,7 +294,49 @@ my-brand/
 
 ---
 
-## 七、License 与 Attribution
+## 七、参与改进 — 让工具持续变好
+
+> **本项目绝不自动收集任何遥测数据**。改进完全靠社区主动反馈,详见 [CONTRIBUTING.md](CONTRIBUTING.md)。
+
+三种贡献方式(按门槛从低到高):
+
+### 📊 提交 Issue + bundle(最低门槛,高价值)
+
+发现 recipe 失效、query 质量问题、channel 反常识 pattern → 提交 Issue,**带上去敏的 bundle 文件**:
+
+```bash
+# 生成匿名化诊断包(自动去除品牌名/竞品名/URL 路径)
+python3 scripts/make-bundle.py <你的测试目录> --vertical "<行业类别>"
+# 输出: bundle-<timestamp>.json
+# 手动 cat 看一眼内容,确认无敏感信息,拖到 Issue 里
+```
+
+3 个 Issue 模板入口:[**新建 Issue**](https://github.com/KnightMafiaLau/GEOVisibilityTool/issues/new/choose)
+- 🔧 **Recipe Broken** — LLM 抓取脚本失效(DOM 变了)
+- 💭 **Query Feedback** — query 质量反馈
+- 📊 **Channel Pattern** — 跨垂类 channel 模式分享
+
+### 🚀 提交 Pull Request
+
+直接改进 SKILL.md / probe.py / 加新 LLM 支持 / 改 report 模板 等。详见 [CONTRIBUTING.md](CONTRIBUTING.md)。
+
+### 💬 Discussions
+
+讨论 GEO 方法论 / 分享投放实战 / 提想法 → [**Discussions**](https://github.com/KnightMafiaLau/GEOVisibilityTool/discussions)
+
+---
+
+### 你的贡献如何反哺工具
+
+- **抓取模型优化** — 社区分享的 bundle + recipe-broken issue 让每个 LLM 的 per-LLM citation recipe 持续修复(LLM 网页端不定期改版)
+- **问题生成优化** — query-feedback 喂回 `geo-queries` SKILL.md 的硬规则与 few-shot,改善后续生成质量
+- **跨垂类 insight** — channel-pattern issue 沉淀到 `geo-channels` 的投放形态 mapping 与 per-LLM 适配策略里
+
+完整隐私立场、贡献流程、PR 规范见 [CONTRIBUTING.md](CONTRIBUTING.md)。
+
+---
+
+## 八、License 与 Attribution
 
 本项目采用 **Apache License 2.0**(完整文本见 [LICENSE](LICENSE)),附 [NOTICE](NOTICE) 文件说明 attribution 义务。
 

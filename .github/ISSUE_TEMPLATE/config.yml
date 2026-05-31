@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: 💬 一般讨论 / 经验分享
+    url: https://github.com/KnightMafiaLau/GEOVisibilityTool/discussions
+    about: 想讨论 GEO 方法论 / 分享投放结果 / 提想法?去 Discussions 比 Issue 更合适
+  - name: 🔐 隐私问题 / 安全披露
+    url: https://github.com/KnightMafiaLau/GEOVisibilityTool/security/advisories/new
+    about: 发现项目代码或文档里有隐私 / 安全风险?私密披露入口

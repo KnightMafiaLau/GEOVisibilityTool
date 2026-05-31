@@ -1,0 +1,70 @@
+name: 📊 Channel Pattern — 跨垂类引用模式分享
+description: 发现某个 LLM × intent × channel 的反常识/强信号模式(如"Qwen 了解原理类去查 Google Patents")— 帮社区积累 cross-vertical insight
+title: "[channel pattern] <LLM> × <intent> — <模式简述>"
+labels: ["channel-insight", "community-share"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感谢分享!这类 issue 帮助所有 GEOVisibilityTool 用户做更准的投放决策。
+        **请附 bundle-*.json**(用 `scripts/make-bundle.py` 生成,已自动去敏),它能让其他人量化你看到的 pattern。
+
+  - type: dropdown
+    id: llm
+    attributes:
+      label: 哪个 LLM
+      options: [Qwen 千问, DeepSeek, Kimi, 豆包 Doubao, 百度文心, 元宝, 跨多个 LLM]
+    validations:
+      required: true
+
+  - type: dropdown
+    id: intent
+    attributes:
+      label: 哪类 intent(可多选)
+      multiple: true
+      options: [探索发现, 选型推荐, 对比评估, 了解原理, 采购投资, 品牌识别]
+    validations:
+      required: true
+
+  - type: textarea
+    id: pattern
+    attributes:
+      label: 观察到的 channel pattern
+      description: 描述你看到的"这个 LLM 在这类 intent 偏好引这些 channel"的模式
+      placeholder: |
+        例 1:Qwen 在了解原理类反复查 patents.google.com(4 次 4 个不同专利号)→ 投放 IP 策略 = 申专利 + 嵌品牌叙述
+        例 2:DeepSeek 在选型推荐类引竞品官网 creality.com 而非自家官网 → 反位策略 = 推自家选型类内容入 LLM 知识池
+    validations:
+      required: true
+
+  - type: input
+    id: vertical
+    attributes:
+      label: 垂类
+      placeholder: "如 3D 打印 / 机器人 / SaaS"
+    validations:
+      required: true
+
+  - type: input
+    id: sample
+    attributes:
+      label: 样本量(probe 跑了多少 query 看出这模式)
+      placeholder: "如 6 条 / 30 条 / 90 条"
+    validations:
+      required: true
+
+  - type: textarea
+    id: bundle
+    attributes:
+      label: 上传 bundle-*.json
+      description: 拖到这里。其他人能从你的 bundle 里看出 channel pattern 的具体数字。
+      placeholder: 拖拽 bundle-*.json 文件到此处。
+
+  - type: textarea
+    id: actionable
+    attributes:
+      label: 这模式对投放策略意味着什么
+      description: 给出你的解读 — 投放团队该怎么用这个 pattern
+      placeholder: |
+        例:这意味着 Qwen 端的技术原理类问题,投放策略不是"发深度技术文",而是"申请专利 + 在专利文档里嵌品牌叙述"——
+        因为 Qwen 在该类问题会绕过普通技术博客,直接到专利库取信息。

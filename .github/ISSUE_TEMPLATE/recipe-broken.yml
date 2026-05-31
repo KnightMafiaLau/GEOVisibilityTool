@@ -1,0 +1,66 @@
+name: 🔧 Recipe Broken — LLM 抓取脚本失效
+description: 某个 LLM 的 per-LLM citation recipe 抓不到引用源了(DOM 变了 / selector 失效 / panel 不出来 / 返回 0)
+title: "[recipe broken] <LLM 名> — <问题简述>"
+labels: ["recipe-broken", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感谢报告!这类 issue 帮助我们持续修复每个 LLM 的 DOM scrape recipe。
+        **请先附上 `bundle-*.json`(用 `python3 scripts/make-bundle.py <测试目录>` 生成,已去敏)**——它包含 panel_opened 率 / citation 分布等关键信号,**不含品牌名 / 竞品名 / URL 路径**。
+
+  - type: dropdown
+    id: llm
+    attributes:
+      label: 哪个 LLM 的 recipe 失效?
+      options: [Qwen 千问, DeepSeek, Kimi, 豆包 Doubao, 百度文心, 元宝, 其他自定义]
+    validations:
+      required: true
+
+  - type: dropdown
+    id: symptom
+    attributes:
+      label: 失效症状
+      options:
+        - panel 按钮点击后不出来(sources 面板没打开)
+        - panel 打开了但 JS extractor 返回 0 个 URL
+        - JS extractor 返回 N 个,但 yaml 实际写入 < N(sanitizer 屏蔽)
+        - panel 出来但 React fiber selector 路径变了
+        - 浏览器抓取整体出错(navigate 失败 / textarea 找不到)
+        - 其他
+    validations:
+      required: true
+
+  - type: textarea
+    id: details
+    attributes:
+      label: 具体描述 + verify-log 输出
+      description: 粘贴 `python3 probe.py verify-log <log-path>` 的输出;不要粘贴 probe-results.yaml 原文(含品牌名)
+      placeholder: |
+        verify-log 输出示例:
+        Qwen (3q, expected_min=5): panel_opened=2/3, domains min=0 median=8 max=12
+          ⚠ ANOMALIES (1):
+            [q011] 对比评估: 0 domains, panel_opened=False
+    validations:
+      required: true
+
+  - type: input
+    id: observed_date
+    attributes:
+      label: 观察到失效的日期
+      placeholder: "2026-05-31(LLM 网页端可能改版,日期帮助定位 DOM 变更窗口)"
+    validations:
+      required: true
+
+  - type: textarea
+    id: bundle
+    attributes:
+      label: 上传 bundle-*.json
+      description: 用 `python3 scripts/make-bundle.py <测试目录>` 生成,**手动检查内容**,然后拖到这里(GitHub 自动上传)。
+      placeholder: 拖拽 bundle-*.json 文件到此处。
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: 复现步骤(可选)
+      placeholder: 不必须,但能告诉我们如何复现就更快修。

@@ -1,0 +1,58 @@
+name: 💭 Query Feedback — 问题质量反馈
+description: 某条 geo-queries 生成的测试问题不够好(太空泛 / 复合题 / 不像真实用户问 / 命中率低)— 帮我们改进 query 生成规则
+title: "[query feedback] <intent 类> — <问题简述>"
+labels: ["query-quality", "needs-review"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感谢反馈!这类 issue 帮助我们优化 `geo-queries` 的生成规则(SKILL.md 里的硬规则与 few-shot)。
+        **不要粘贴含品牌名的 query**——用占位符 BRAND_X / COMP_1 等替代,或描述问题模式。
+
+  - type: dropdown
+    id: intent
+    attributes:
+      label: query 所属 intent 类
+      options: [探索发现, 选型推荐, 对比评估, 了解原理, 采购投资, 品牌识别]
+    validations:
+      required: true
+
+  - type: textarea
+    id: query_text
+    attributes:
+      label: 原 query(脱敏后)
+      description: 把品牌名 / 竞品名替换成 BRAND_X / COMP_1。例:"BRAND_X 是什么公司?" 或 "做 X 用哪个最合适?"
+      placeholder: "BRAND_X 在 SaaS 领域跟 COMP_1 比怎么样?"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: problem
+    attributes:
+      label: 这条 query 的问题
+      multiple: true
+      options:
+        - 太空泛 / 抽象(LLM 答不出有用信息)
+        - 复合题(一句问了两件事)
+        - multiple-choice 引导式("是 X 还是 Y 还是 Z?")
+        - 不像真实用户问(教科书 / 营销 / AI 自动生成感)
+        - 太长 / 句式拗口
+        - 太短 / 缺细节
+        - 跟垂类不贴合(泛化到行业之外)
+        - LLM 在 5+ 平台都 0 命中(可能 query 框架本身就排除 target)
+        - 其他
+    validations:
+      required: true
+
+  - type: textarea
+    id: improvement
+    attributes:
+      label: 你建议改成什么
+      description: 给出一条改进后的脱敏 query(可选)
+      placeholder: "BRAND_X 主要做什么产品?(把'是什么公司'改成'做什么产品',更贴近真实用户句式)"
+
+  - type: input
+    id: vertical
+    attributes:
+      label: 垂类(可选,但很有帮助)
+      placeholder: "3D 打印 / 机器人 / SaaS / 消费电子 / 医疗器械 / 等"
