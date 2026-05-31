@@ -38,15 +38,18 @@ custom_llms: []                              # 自定义 LLM 的 name/url/notes
 - [x] **模块 5:`geo-channels`** — 把 analysis(+ optional report)翻译成 **actionable 投放建议**。**双输出 .md + .html**,沿用 Topify-CEO 风格。**7 节结构**:Hero / 🔥 紧急处理(负面/误识别 priority) / 优先 channel top 10 grid(带 ROI + 形态 pill) / Per-LLM 适配(内容+渠道双维度) / 竞品反位攻关 / 零命中攻关。ROI 定性 high/med/low 公开公式。投放形态 mapping(知乎专栏→深度文,smzdm→购买决策,B 站→视频,谷歌专利→signal-非channel 等 14 类)。**剔除规则**:竞品官网 + 搜索引擎/索引类站不进 channel grid。**不给具体 content brief / 不算定量 ROI / 不出投放预算 / 不写 timeline 拆分**——边界严格止于"该投哪 + 什么形态 + 主题"。纯 skill。
       → `skills/geo-channels/SKILL.md`
 
-- [x] **模块 6(拼合):`geo-harness`** — 总入口编排,串起前 5 个。**一句话触发,6 phase + 5 个 checkpoint**:Phase 1 拿品牌信息→geo-queries / Phase 2 写 probe-plan / Phase 3 对每个 LLM 调 geo-probe / Phase 4 geo-analyze / Phase 5 geo-report(自动打开 html) / Phase 6 geo-channels(自动打开 html)。**支持断点续跑**——从测试目录现有文件状态推断当前阶段。**所有 sub-skill 通过 Skill tool 调用,不复制逻辑**。失败绝不自动重试。同目录假设硬约束。纯 skill。
+- [x] **模块 6(拼合):`geo-harness`** — 总入口编排,串起前 5 个。**一句话触发,6 phase + 5 个 checkpoint**:Phase 1 拿品牌信息→geo-queries / Phase 2 写 probe-plan / Phase 3 对每个 LLM 调 geo-probe / Phase 4 geo-analyze / Phase 5 geo-report(自动打开 html) / Phase 6 geo-channels(自动打开 html) / Phase 6.5 自动 ingest 到 KB。**支持断点续跑**。所有 sub-skill 通过 Skill tool 调用,不复制逻辑。失败绝不自动重试。同目录假设硬约束。纯 skill。
       → `skills/geo-harness/SKILL.md`
+
+- [x] **模块 7:`geo-kb`** — 本地知识库管理。每次 harness 跑完自动 ingest 产物到 ~/.geo-kb/kb.sqlite。3 表 schema:`runs`(总览 + visibility)/ `citations`(展平 URL × LLM × intent,标记 brand/competitor owned)/ `recipe_health`(panel_opened / anomaly 日志)。query 命令:`channels`(跨 brand 找强信号)/ `trend`(品牌历史)/ `recipe-health`(LLM 抓取健康度)/ `benchmark`(垂类对比)/ `export`(单 run 视图)。**stdlib only(sqlite3),~250 行,纯本地,绝不上传**。配套 `scripts/kb.py`(scripts/ 下,不受 Constitution §6 的 150 行约束)。
+      → `skills/geo-kb/SKILL.md` + `scripts/kb.py`
 
 ## 进行中
 
 （暂无）
 
-## 待定（按顺序）
+## 待定
 
-(全部模块 v2 完成)
+(v1 全部模块完成。v2 候选:KB-aware sub-skill 接入 / 多机 KB 同步 / web dashboard 等)
 
 每做完一个模块都先单独跑通，再拼下一个。

@@ -294,7 +294,56 @@ my-brand/
 
 ---
 
-## 七、参与改进 — 让工具持续变好
+## 七、本地知识库(自动累积 + 跨 brand 学习)
+
+每次 harness 跑完都会**自动 ingest 到本地 KB**(`~/.geo-kb/kb.sqlite`),累积形成"跨 brand、跨 vertical、跨时间"的可查询知识库。
+
+**stdlib only,纯本地,绝不上传**。备份就是 `cp ~/.geo-kb/kb.sqlite ...`。
+
+### 数据维度
+
+| 表 | 内容 |
+|---|---|
+| `runs` | 每次跑的总览(brand / vertical / 时间 / visibility / LLM 列表) |
+| `citations` | 每条引用 URL(展平 by query × LLM × intent;标记 brand-owned / competitor-owned) |
+| `recipe_health` | 每条 query 的抓取健康度(panel_opened / urls_found / domains_unique / anomaly flag) |
+
+### 跨 brand 查询能力
+
+```bash
+# 跨所有 brand 看 Qwen 在了解原理类引谁最多
+python3 scripts/kb.py query channels --llm Qwen --intent 了解原理
+
+# 限定到某垂类
+python3 scripts/kb.py query channels --llm Qwen --intent 了解原理 --vertical "3D 打印"
+
+# 某品牌历史 visibility 趋势
+python3 scripts/kb.py query trend --brand 拓竹科技
+
+# 某 LLM 的 recipe 健康度有没有下降
+python3 scripts/kb.py query recipe-health --llm DeepSeek
+
+# 某垂类 cross-brand visibility 基准
+python3 scripts/kb.py query benchmark --vertical "3D 打印"
+
+# KB 总览
+python3 scripts/kb.py stats
+```
+
+### KB 如何反哺工具改进
+
+跑得越多,KB 越准。后续 sub-skill 可以查 KB 来:
+
+- **生成更贴垂类的 query**(geo-queries 看历史哪种 query 在该垂类产生高信号)
+- **校准 ROI 定级**(geo-channels 看哪个 channel 在历史上对多少个 brand 真的见效)
+- **检测 LLM 风格漂移**(recipe-health 趋势提示某 LLM 改版了)
+- **给 visibility 加 cross-vertical benchmark**(geo-analyze 报告"本品牌 91.6,同垂类平均 75.3")
+
+详见 `skills/geo-kb/SKILL.md`。
+
+---
+
+## 八、参与改进 — 让工具持续变好
 
 > **本项目绝不自动收集任何遥测数据**。改进完全靠社区主动反馈,详见 [CONTRIBUTING.md](CONTRIBUTING.md)。
 
@@ -336,7 +385,7 @@ python3 scripts/make-bundle.py <你的测试目录> --vertical "<行业类别>"
 
 ---
 
-## 八、License 与 Attribution
+## 九、License 与 Attribution
 
 本项目采用 **Apache License 2.0**(完整文本见 [LICENSE](LICENSE)),附 [NOTICE](NOTICE) 文件说明 attribution 义务。
 

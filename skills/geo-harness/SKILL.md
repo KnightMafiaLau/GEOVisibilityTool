@@ -168,6 +168,30 @@ geo-probe 第 1.2 节自带"首次跑→问 planned_llms→建 plan"逻辑。但
 > - `<path>/channels-<brand>-<date>.md`
 > - `<path>/channels-<brand>-<date>.html`(已在浏览器打开)
 
+### 9.5. Phase 6.5 — 自动 ingest 到本地 KB
+
+跑完整端到端后,**自动**把这次产物 ingest 到本地 ~/.geo-kb/kb.sqlite,累积跨 brand 经验。
+
+```bash
+# 第一次跑 KB 之前(如果 ~/.geo-kb/ 不存在)
+python3 <repo>/scripts/kb.py init
+
+# 每次跑完都自动 ingest
+python3 <repo>/scripts/kb.py ingest <测试目录> --vertical "<品牌所在垂类>"
+```
+
+**垂类(vertical)输入**:
+- 如果 plan.yaml 或品牌信息里有"垂类"字段,直接用
+- 没有就**问用户一次**:"这个品牌属于什么垂类?如 3D 打印 / SaaS / 机器人 / 消费电子 等。这个标签让后续跨 brand 查询能聚合到同垂类"
+- 用户拒绝填,标 `vertical=未分类`(后续 query 时该 brand 不会出现在 vertical-filtered 结果里)
+
+完成后简短报告:
+
+> KB 已更新:run_id=<N> · 累积 <X> runs / <Y> brands / <Z> verticals
+>
+> 后续可查:`scripts/kb.py query channels --llm Qwen --intent 选型推荐 --vertical "<V>"`
+> 或:`scripts/kb.py stats`
+
 ### 10. 完成:产物清单 + 总结
 
 > ✓ GEO harness 跑完。测试目录:`<path>`
