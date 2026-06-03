@@ -257,7 +257,19 @@ Claude: [调 geo-harness skill]
 
 ---
 
-## 五、产物示例
+## 五、真实案例
+
+跑完一次完整 harness 长什么样?看真实品牌案例最直接:
+
+| 案例 | 行业 / 垂类 | 看点 |
+|---|---|---|
+| [简知 App · 2026-05-31](./examples/jianzhi-20260531/) | AI / 教育科技 — AI 学习 | 「收录但不提及」典型(识别率 100% / 自然提及 2.5%)+ **紧急声誉风险挖掘**(LLM 答品牌时主动连带负面叙事)+ 12 周渠道行动日历 |
+
+更多案例索引见 [`examples/`](./examples/)。欢迎 PR 你自己的测量案例。
+
+---
+
+## 六、产物示例
 
 完整跑一次 harness 后,测试目录下产物:
 
@@ -279,7 +291,7 @@ my-brand/
 
 ---
 
-## 六、项目原则(Constitution)
+## 七、项目原则(Constitution)
 
 详见 [CONSTITUTION.md](CONSTITUTION.md)。核心 6 条:
 
@@ -294,7 +306,7 @@ my-brand/
 
 ---
 
-## 七、可选硬约束:hooks(防 agent 自作主张)
+## 八、可选硬约束:hooks(防 agent 自作主张)
 
 **问题**:Skills 是软约束。Claude 可能跑完 `geo-analyze` 后用 `Write` 直接造 report/channels(绕过 dedicated skill)→ 产物缺水印 / 缺 Topify 结构 / 不合规。
 
@@ -318,7 +330,7 @@ hooks/install.sh   # 需要 jq;自动备份 ~/.claude/settings.json
 
 ---
 
-## 八、本地知识库(自动累积 + 跨 brand 学习)
+## 九、本地知识库(自动累积 + 跨 brand 学习)
 
 每次 harness 跑完都会**自动 ingest 到本地 KB**(`~/.geo-kb/kb.sqlite`),累积形成"跨 brand、跨 vertical、跨时间"的可查询知识库。
 
@@ -367,7 +379,7 @@ python3 scripts/kb.py stats
 
 ---
 
-## 九、参与改进 — 让工具持续变好
+## 十、参与改进 — 让工具持续变好
 
 > **本项目绝不自动收集任何遥测数据**。改进完全靠社区主动反馈,详见 [CONTRIBUTING.md](CONTRIBUTING.md)。
 
@@ -409,7 +421,7 @@ python3 scripts/make-bundle.py <你的测试目录> --vertical "<行业类别>"
 
 ---
 
-## 十、License 与 Attribution
+## 十一、License 与 Attribution
 
 本项目采用 **Apache License 2.0**(完整文本见 [LICENSE](LICENSE)),附 [NOTICE](NOTICE) 文件说明 attribution 义务。
 
