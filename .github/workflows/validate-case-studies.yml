@@ -1,0 +1,42 @@
+name: Validate Case Studies
+
+# 在 PR 改动 examples/ 时跑,确保每份 case study README 都满足 7 节式结构。
+# 失败信息会标出缺哪节,贡献者直接照着改即可。
+
+on:
+  pull_request:
+    paths:
+      - 'examples/**'
+      - 'scripts/validate-case-study.py'
+      - '.github/workflows/validate-case-studies.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'examples/**'
+      - 'scripts/validate-case-study.py'
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # 拉全量历史,才能 diff vs origin/main
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Validate changed case studies (PR mode)
+        if: github.event_name == 'pull_request'
+        run: |
+          git fetch origin ${{ github.base_ref }} --depth=1
+          python3 scripts/validate-case-study.py --changed --base origin/${{ github.base_ref }}
+
+      - name: Validate all case studies (push to main)
+        if: github.event_name == 'push'
+        run: python3 scripts/validate-case-study.py examples/

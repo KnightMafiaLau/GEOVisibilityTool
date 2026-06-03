@@ -1,0 +1,209 @@
+name: 📒 Case Study — 贡献一份真实测量案例
+description: 跑过 GEOVisibilityTool 测一个真实品牌?把案例提交进 examples/,让后来者能直接看产物长什么样。本 issue 是"轻量起草";如果信息齐了我们再帮你转成 PR。
+title: "[case-study] <品牌名> · <YYYY-MM-DD>"
+labels: ["case-study", "community-share"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感谢分享!**真实案例**是这个仓库对新用户最有说服力的东西——比 SKILL.md 文字更直观。
+
+        提交前请确认:
+        - ✅ 案例**真实跑过**,所有数字、引用源、零命中场景来自实测,不是脑补/编造
+        - ✅ 品牌信息属实(可以是你自家品牌,也可以是公开可测的第三方品牌)
+        - ✅ 公开发布**不会**对第三方造成不当影响 — 竞品评分基于公开 LLM 答案是 OK 的,但请负责任地展示
+        - ✅ **去敏**了 probe 原始数据(`probe-results-*.yaml` 可能含第三方网页内容片段,自己看着办)
+
+        参考已有案例:[`examples/jianzhi-20260531/`](https://github.com/KnightMafiaLau/GEOVisibilityTool/tree/main/examples/jianzhi-20260531)
+
+  # ============ 一、品牌信息 ============
+  - type: markdown
+    attributes:
+      value: "## 一、案例品牌信息"
+
+  - type: input
+    id: brand_cn
+    attributes:
+      label: 品牌中文名
+      placeholder: "如 简知"
+    validations:
+      required: true
+
+  - type: input
+    id: brand_en
+    attributes:
+      label: 品牌英文名
+      placeholder: "如 Bambu Lab(没有就填'无')"
+    validations:
+      required: true
+
+  - type: input
+    id: industry
+    attributes:
+      label: 行业
+      placeholder: "如 AI / 教育科技 ; 消费电子 ; 在线职业培训"
+    validations:
+      required: true
+
+  - type: input
+    id: vertical
+    attributes:
+      label: 垂类(更细的类别,会被 KB 用来跨案例聚合)
+      placeholder: "如 AI 学习 ; 消费级 3D 打印 ; SaaS 协作"
+    validations:
+      required: true
+
+  - type: input
+    id: positioning
+    attributes:
+      label: 一句话定位
+      placeholder: "如 AI 终身学习 App ; 桌面级 3D 打印机龙头"
+    validations:
+      required: true
+
+  - type: input
+    id: competitors
+    attributes:
+      label: 主要竞品(3-5 个,逗号分隔)
+      placeholder: "如 得到、千聊、Duolingo"
+    validations:
+      required: true
+
+  # ============ 二、测试设置 ============
+  - type: markdown
+    attributes:
+      value: "## 二、测试设置"
+
+  - type: input
+    id: test_date
+    attributes:
+      label: 测试日期(YYYY-MM-DD)
+      placeholder: "2026-05-31"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: llms
+    attributes:
+      label: 覆盖的 LLM(可多选)
+      multiple: true
+      options:
+        - DeepSeek
+        - Qwen 千问
+        - Kimi
+        - 豆包 Doubao
+        - 百度文心
+        - 元宝
+        - 其他(在下方备注)
+    validations:
+      required: true
+
+  - type: input
+    id: data_points
+    attributes:
+      label: 数据点数(N LLM × 30 query)
+      placeholder: "如 60(2 LLM × 30 query)"
+    validations:
+      required: true
+
+  # ============ 三、关键发现摘要 ============
+  - type: markdown
+    attributes:
+      value: "## 三、关键发现摘要(后面写完整 case 用)"
+
+  - type: input
+    id: total_score
+    attributes:
+      label: 总体可见度得分(0-100)
+      placeholder: "如 38.5"
+    validations:
+      required: true
+
+  - type: input
+    id: recognition_rate
+    attributes:
+      label: 品牌识别率
+      placeholder: "如 100%(LLM 都知道品牌是什么)"
+
+  - type: input
+    id: natural_mention_rate
+    attributes:
+      label: 自然提及率
+      placeholder: "如 2.5%(场景性 query 里自然出现的频次)"
+
+  - type: textarea
+    id: core_diagnosis
+    attributes:
+      label: 核心诊断(一段话)
+      description: 一句话概括这个品牌的 GEO 状态。是「收录但不提及」?「被竞品默认答案吃了」?「有声誉风险」?
+      placeholder: |
+        例:LLM 知道简知是什么(识别率 100%),但在回答任何场景性问题时都不会自然想到它。
+        这不是被误解的问题——而是还没有成为任何场景的默认答案。
+    validations:
+      required: true
+
+  - type: textarea
+    id: urgent_risk
+    attributes:
+      label: 紧急风险(如有)
+      description: 测量是否挖出了团队此前不知道的问题?(典型:LLM 答品牌时主动连带负面叙事)
+      placeholder: "如无可空着。例:DeepSeek 答简知是什么时,主动连带了简橙瑜伽投诉/退费争议,引用源 tousu.sina.com.cn"
+
+  # ============ 四、产物附件 ============
+  - type: markdown
+    attributes:
+      value: "## 四、产物附件"
+
+  - type: textarea
+    id: report_pdf
+    attributes:
+      label: 上传 report-<brand>-<date>.pdf
+      description: 从原生 HTML 浏览器 Cmd+P 导出。拖拽到此处。
+      placeholder: 拖拽 report-<brand>-<date>.pdf 到此处
+    validations:
+      required: true
+
+  - type: textarea
+    id: channels_pdf
+    attributes:
+      label: 上传 channels-<brand>-<date>.pdf
+      description: 同上,渠道指南那份。
+      placeholder: 拖拽 channels-<brand>-<date>.pdf 到此处
+    validations:
+      required: true
+
+  - type: textarea
+    id: bundle_json
+    attributes:
+      label: (可选)上传 bundle-<brand>-<date>.json
+      description: 用 `scripts/make-bundle.py` 生成,已自动去敏。让其他人能从数据层重现你的分析。
+      placeholder: 拖拽 bundle-<brand>-<date>.json 到此处
+
+  # ============ 五、贡献意愿 ============
+  - type: markdown
+    attributes:
+      value: "## 五、贡献方式"
+
+  - type: dropdown
+    id: pr_intent
+    attributes:
+      label: 你想怎么走?
+      options:
+        - 我开 PR(我会照 examples/jianzhi-20260531/ 的 7 节式格式写好 README)
+        - 我只起草到这里,请帮我转成 PR(信息上面填了,产物上传了)
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: confirmations
+    attributes:
+      label: 提交前确认
+      options:
+        - label: 案例真实跑过,数字/引用源/零命中场景来自实测,不是编造
+          required: true
+        - label: 品牌信息属实,公开发布不会对第三方造成不当影响
+          required: true
+        - label: 已去敏 probe 原始数据中可能涉及的第三方内容片段
+          required: true
+        - label: 我了解 PR 进仓库后 CI 会检查 README 7 节式结构,缺章节会被自动 block
+          required: true
