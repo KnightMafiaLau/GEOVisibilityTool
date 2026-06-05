@@ -308,7 +308,7 @@ my-brand/
 
 ## 八、可选硬约束:hooks(防 agent 自作主张)
 
-**问题**:Skills 是软约束。Claude 可能跑完 `geo-analyze` 后用 `Write` 直接造 report/channels(绕过 dedicated skill)→ 产物缺水印 / 缺 Topify 结构 / 不合规。
+**问题**:Skills 是软约束。Claude 可能跑完 `geo-analyze` 后用 `Write` 直接造 report/channels(绕过 dedicated skill)→ 产物缺水印 / 缺结构 / 不合规。
 
 **解决**:用 Claude Code 的 **hooks** 机制做硬约束。安装后,Claude 试图 Write 任何 `report-*-*.html/md` 或 `channels-*-*.html/md` 时,hook 拦截 → 检查 content 是否含必需 marker(水印 / hero-card / heatmap / urgent-block 等)→ 缺一就 `block` + 提示用 Skill tool。
 
